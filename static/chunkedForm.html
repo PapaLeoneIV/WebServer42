@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chunked File Upload</title>
+</head>
+<body>
+    <h1>Chunked File Upload</h1>
+    <form id="uploadForm">
+        <label for="file">Select File:</label>
+        <input type="file" id="file" name="file" required>
+        <button type="button" id="uploadButton">Upload</button>
+    </form>
+    <div id="status"></div>
+
+    <script>
+        document.getElementById('uploadButton').addEventListener('click', async () => {
+            const fileInput = document.getElementById('file');
+            const statusDiv = document.getElementById('status');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                statusDiv.textContent = 'Please select a file!';
+                return;
+            }
+
+            const chunkSize = 1024 * 1024; // 1MB per chunk
+            const totalChunks = Math.ceil(file.size / chunkSize);
+            let currentChunk = 0;
+
+            statusDiv.textContent = `Uploading ${file.name} (${totalChunks} chunks)...`;
+
+            while (currentChunk < totalChunks) {
+                const start = currentChunk * chunkSize;
+                const end = Math.min(start + chunkSize, file.size);
+                const chunk = file.slice(start, end);
+
+                try {
+                    await sendChunk(chunk, currentChunk, totalChunks, file.name);
+                    statusDiv.textContent = `Uploaded chunk ${currentChunk + 1} of ${totalChunks}`;
+                    currentChunk++;
+                } catch (error) {
+                    statusDiv.textContent = `Error uploading chunk ${currentChunk + 1}: ${error}`;
+                    break;
+                }
+            }
+
+            if (currentChunk === totalChunks) {
+                statusDiv.textContent = 'Upload complete!';
+            }
+        });
+
+        async function sendChunk(chunk, chunkIndex, totalChunks, fileName) {
+            const formData = new FormData();
+            formData.append('chunk', chunk);
+            formData.append('chunkIndex', chunkIndex);
+            formData.append('totalChunks', totalChunks);
+            formData.append('fileName', fileName);
+
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+        }
+    </script>
+</body>
+</html>

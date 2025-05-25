@@ -9,27 +9,33 @@
 #include <stdlib.h>
 class Client;
 
-class Cgi {
-
-
+class Cgi{
 public:
-    Cgi();
-    ~Cgi();
+    //main function
+    void execute(Client *c);
+    
+    //setup
+    char **generateEnv(Client *c, std::string target);
     void reset();
-    void setArgs(std::string target, Client *client);
-    char **getArgs() ;
-    char **generateEnv(Client *client, std::string scriptPath);
-    void execute(Client *client);
-    void freeEnv(char **envp);
-    void setEnv(char **envp);
+    
+    //getter
+    char **getArgs();
     char **getEnv() const;
-    void setCGIState(int state);
-    int getCGIState();
     int *getPipeIn();
     int *getPipeOut();
     int getCgiPid();
     size_t getBytesSended();
+    int getCGIState();
+    
+    
+    //setters
+    void setArgs(std::string target, Client *c);
+    void setEnv(char **envp);
+    void setCGIState(int state);
     void incrementBytesSended(size_t bytes);
+
+    Cgi();
+    ~Cgi();
 private:
     int cgi_state;
     char **args;
@@ -40,7 +46,5 @@ private:
     size_t bytes_sended;
     pid_t pid;
 };
-
-
 
 #endif // CGI_HPP

@@ -1,10 +1,8 @@
 #include "../includes/ConfigParser.hpp"
 #include "../includes/Booter.hpp"
-#include "../includes/Exception.hpp"
 #include "../includes/Logger.hpp"
 #include "../includes/Treenode.hpp"
 
-#include <sstream>
 
 #define push_back_next_token(token, tokenIdx) \
     lineStream >> token;                      \
@@ -41,7 +39,7 @@ void ConfigParser::deleteTree(Treenode *node)
 
     delete node;
 }
-     std::vector<Server> ConfigParser::fromConfigFileToServers(char *file)
+     std::vector<Server> ConfigParser::extractServerConfiguration(char *file)
     {
     
         std::vector<Server> servers;
@@ -79,10 +77,8 @@ void ConfigParser::deleteTree(Treenode *node)
         return servers;
     }
     
-    /// @brief This function takes a path to a config file, and transforms the nested directives into a tree that will later on be parsed into a Server Class  
-    /// @param path 
-    /// @return the tree node head
-    Treenode *ConfigParser::createConfigTree(std::string path)
+    //This function takes a path to a config file, and transforms the nested directives into a tree that will later on be parsed into a Server Class  
+    Treenode *ConfigParser::createConfigTree(const std::string& path)
     {
     
         std::ifstream file(path.c_str());
@@ -193,12 +189,12 @@ void ConfigParser::deleteTree(Treenode *node)
         return root;
     }
     
-/** This function uses fnToParseDirectives, its a map of string and functions.
+/** This function uses parsingFunctions, its a map of string and functions.
     The associated functions are used to parse the values of the directives.
     ex:
-    fnToParseDirectives["listen"] = &ConfigParser::parseListenValues;
+    parsingFunctions["listen"] = &ConfigParser::parseListenValues;
     or
-    fnToParseDirectives["host"] = &ConfigParser::parseHostValues;
+    parsingFunctions["host"] = &ConfigParser::parseHostValues;
 */
 bool ConfigParser::verifyDirectives(Server &server)
 {
@@ -210,11 +206,11 @@ bool ConfigParser::verifyDirectives(Server &server)
         if(nginxDir == "error_page" && nginxDirValue.size() > 0){
                 nginxDir = nginxDir + "_" + nginxDirValue[0];            
         }
-        if(this->fnToParseDirectives.find(nginxDir) == this->fnToParseDirectives.end()){
+        if(this->parsingFunctions.find(nginxDir) == this->parsingFunctions.end()){
             Logger::error(this->getFileName(), "directive " + nginxDir + " is not a valid server directive");
             return 1;
         }
-        if ((this->*fnToParseDirectives[nginxDir])(nginxDirValue))
+        if ((this->*parsingFunctions[nginxDir])(nginxDirValue))
             return 1;
     }
     std::map<std::string, ConfigDirectiveMap>::iterator locationDirIt;
@@ -226,7 +222,7 @@ bool ConfigParser::verifyDirectives(Server &server)
         {
             std::string nginxLocationDir = (*locationDirMapIt).first;
             std::vector<std::string> nginxLocationDirValue = (*locationDirMapIt).second;
-            if ((this->*fnToParseDirectives[nginxLocationDir])(nginxLocationDirValue))
+            if ((this->*parsingFunctions[nginxLocationDir])(nginxLocationDirValue))
                 return 1;
         }
     }
@@ -305,7 +301,7 @@ std::string removeEmptyLines(const std::string &input)
     directive is not valid, in which case will be noticed by ConfigParser later. Or the directive
     is 'server' or 'location'.
     */
-int ConfigParser::isValidDirective(std::string token)
+int ConfigParser::isValidDirective(const std::string& token)
 {
     std::vector<std::string>::iterator it;
     for (it = this->directives.begin(); it != this->directives.end(); ++it){
@@ -315,7 +311,7 @@ int ConfigParser::isValidDirective(std::string token)
     return 0;
 }
 
-int ConfigParser::validatePath(std::string path)
+int ConfigParser::validatePath(const std::string &path)
 {
     this->setFileName(path);
     if (path.empty()){
@@ -859,7 +855,7 @@ int setUpDefaultDirectiveValues(Server *server)
     return 0;
 }
 
-int ConfigParser::checkForAllowdMultipleDirectives(std::string directive)
+int ConfigParser::checkForAllowdMultipleDirectives(const std::string& directive)
 {
     std::vector<std::string> allowdMultipleDirectives;
     allowdMultipleDirectives.push_back("error_page");
@@ -972,28 +968,30 @@ int ConfigParser::checkMandatoryDirectives(Server &server)
     return 0;
 }
 
-void ConfigParser::setFileName(std::string file){this->fileName = file;}
+void ConfigParser::setFileName(const std::string &file){this->fileName = file;}
 
 std::string ConfigParser::getFileName(){return this->fileName;}
 
+
+//init array of functions and directive values for parsing
 void ConfigParser::init(){
-    fnToParseDirectives["listen"] = &ConfigParser::parseListenValues;
-    fnToParseDirectives["host"] = &ConfigParser::parseHostValues;
-    fnToParseDirectives["server_name"] = &ConfigParser::parseServerNameValues;
+    parsingFunctions["listen"] = &ConfigParser::parseListenValues;
+    parsingFunctions["host"] = &ConfigParser::parseHostValues;
+    parsingFunctions["server_name"] = &ConfigParser::parseServerNameValues;
     for(int i = 100; i < 600; i++){
-        std::string error_page = "error_page_" + intToStr(i);
-        fnToParseDirectives[error_page] = &ConfigParser::parseErrorPageValues;
+        std::string error_page = "error_page_" + wb_itos(i);
+        parsingFunctions[error_page] = &ConfigParser::parseErrorPageValues;
     }
-    fnToParseDirectives["client_max_body_size"] = &ConfigParser::parseClientMaxBodyValues;
-    fnToParseDirectives["root"] = &ConfigParser::parseRootValues;
-    fnToParseDirectives["index"] = &ConfigParser::parseIndexValues;
-    fnToParseDirectives["autoindex"] = &ConfigParser::parseAutoIndexValues;
-    fnToParseDirectives["allow_methods"] = &ConfigParser::parseAllowMethodsValues;
-    fnToParseDirectives["return"] = &ConfigParser::parseReturnValues;
-    fnToParseDirectives["alias"] = &ConfigParser::parseAliasValues;
-    fnToParseDirectives["cgi_ext"] = &ConfigParser::parseCgiExtValues;
-    fnToParseDirectives["cgi_path"] = &ConfigParser::parseCGIPathValues;
-    fnToParseDirectives["proxy_pass"] = &ConfigParser::parseProxyPassValues;
+    parsingFunctions["client_max_body_size"] = &ConfigParser::parseClientMaxBodyValues;
+    parsingFunctions["root"] = &ConfigParser::parseRootValues;
+    parsingFunctions["index"] = &ConfigParser::parseIndexValues;
+    parsingFunctions["autoindex"] = &ConfigParser::parseAutoIndexValues;
+    parsingFunctions["allow_methods"] = &ConfigParser::parseAllowMethodsValues;
+    parsingFunctions["return"] = &ConfigParser::parseReturnValues;
+    parsingFunctions["alias"] = &ConfigParser::parseAliasValues;
+    parsingFunctions["cgi_ext"] = &ConfigParser::parseCgiExtValues;
+    parsingFunctions["cgi_path"] = &ConfigParser::parseCGIPathValues;
+    parsingFunctions["proxy_pass"] = &ConfigParser::parseProxyPassValues;
 
     directives.push_back("listen");
     directives.push_back("host");
@@ -1017,5 +1015,4 @@ ConfigParser::ConfigParser()
 };
 #include "../includes/Logger.hpp"
 ConfigParser::~ConfigParser() {
-    Logger::info("ConfigParser Destructor Called()");
 };

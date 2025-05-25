@@ -10,7 +10,6 @@
 #include <bits/stdc++.h>
 #include <dirent.h>
 #include <assert.h>
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <fcntl.h>
@@ -126,7 +125,11 @@ int handle_arguments(int argc , char **argv);
 
 std::string to_lower(const std::string& input);
 
-int strToHex(const std::string& str);
+int wb_stox(const std::string& str);
+
+std::string wb_itos(int number);
+
+int wb_stoi(std::string str);
 
 std::string fromDIRtoHTML(std::string dirPath, std::string url);
 
@@ -138,11 +141,7 @@ std::string getContentType(std::string& url, int status);
 
 std::string ErrToStr(int error);
 
-std::string intToStr(int number);
 
-int strToInt(std::string str);
-
-int checkPermissions(std::string fullPath,int mode);
 
 std::string getErrorPage(int status, Server *server);
 #endif

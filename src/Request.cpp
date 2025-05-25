@@ -4,17 +4,16 @@
 #include "../includes/ConfigParser.hpp"
 
 /**
- * After we user recv(), we pass the request to consume().
- * It will analyze the request character by character, trying to
- * respect the HTTP protocol standard for request firstline, headers and body.
- * While doing so, it keeps track of the various states of the request and where it
- * did stop parsing. So that, it the request is chunked, or
- * if the Client sended just a portion of the request, and will send the next one later,
+ * After we user recv(), we pass the req to consume().
+ * It will analyze the req character by character, trying to
+ * respect the HTTP protocol standard for req firstline, headers and body.
+ * While doing so, it keeps track of the various states of the req and where it
+ * did stop parsing. So that, it the req is chunked, or
+ * if the Client sended just a portion of the req, and will send the next one later,
  * consume() will be able to resume parsing where it previously stopped.
  */
 
-
-int Request::consume(std::string buffer)
+int Request::consume(const std::string &buffer)
 {
     for (size_t i = 0; i < buffer.size(); i++)
     {
@@ -23,94 +22,37 @@ int Request::consume(std::string buffer)
         {
         case StateMethod:
         {
-            // if (character == this->methods[GET][this->raw.size()])
-            // {
-            //     this->content += character;
-            //     this->raw += character;
-            //     if (this->raw.size() == this->methods[GET].size())
-            //     {
-            //         this->method = this->content;
-            //         this->content.clear();
-            //         if (this->method != this->methods[GET])
-            //         {
-            //             this->error = 400; // Bad Request
-            //             this->state = StateParsingError;
-            //             return 1;
-            //         }
-            //         this->state = StateSpaceAfterMethod;
-            //         continue;
-            //     }
-            //     continue;
-            // }
-            // if (character == this->methods[POST][this->raw.size()])
-            // {
-            //     this->content += character;
-            //     this->raw += character;
-            //     if (this->raw.size() == this->methods[POST].size())
-            //     {
-            //         this->method = this->content;
-            //         this->content.clear();
-            //         if (this->method != this->methods[POST])
-            //         {
-            //             this->error = 400; // Bad Request
-            //             this->state = StateParsingError;
-            //             return 1;
-            //         }
-            //         this->state = StateSpaceAfterMethod;
-            //         continue;
-            //     }
-            //     continue;
-            // }
-            // if (character == this->methods[DELETE][this->raw.size()])
-            // {
-            //     this->raw += character;
-            //     this->content += character;
-            //     if (this->raw.size() == this->methods[DELETE].size())
-            //     {
-            //         this->method = this->content;
-            //         this->content.clear();
-            //         if (this->method != this->methods[DELETE])
-            //         {
-            //             this->error = 400; // Bad Request
-            //             this->state = StateParsingError;
-            //             return 1;
-            //         }
-            //         this->state = StateSpaceAfterMethod;
-            //         continue;
-            //     }
-            //     continue;
-            // }
-            // this->error = 501; // invalid method(Not Implemented)
-            // this->state = StateParsingError;
-            // return 1;
-            // Accumulate until we see a space (end of method)
-                if (character != ' ') {
-                    this->raw += character;
-                    this->content += character;
-                    continue;
-                }
-            
-                this->method = this->content;
-                this->content.clear();
-            
-                if (this->method == this->methods[GET] ||
-                    this->method == this->methods[POST] ||
-                    this->method == this->methods[DELETE]) {
-                    this->state = StateSpaceAfterMethod;
-                } else {
-                    this->error = 501; // Not Implemented
-                    this->state = StateParsingError;
-                    return 1;
-                }
-                i--;
+            if (character != ' ')
+            {
+                this->raw += character;
+                this->content += character;
                 continue;
+            }
+
+            this->method = this->content;
+            this->content.clear();
+
+            if (this->method == this->methods[GET] ||
+                this->method == this->methods[POST] ||
+                this->method == this->methods[DELETE])
+            {
+                this->state = StateSpaceAfterMethod;
+            }
+            else
+            {
+                this->error = 501; // Not Implemented
+                this->state = StateParsingError;
+                return 1;
+            }
+            i--;
+            continue;
         }
         case StateSpaceAfterMethod:
         {
             this->raw += character;
             if (character != ' ')
             {
-                this->error = 400; // request not valid
+                this->error = 400; // req not valid
                 this->state = StateParsingError;
                 return 1;
             }
@@ -122,7 +64,7 @@ int Request::consume(std::string buffer)
             this->raw += character;
             if (character != '/')
             {
-                this->error = 400; // request not valid
+                this->error = 400; // req not valid
                 this->state = StateParsingError;
                 return 1;
             }
@@ -151,8 +93,6 @@ int Request::consume(std::string buffer)
                 }
                 this->content.clear();
                 this->state = StateUrlQuery;
-                // TODO: create state to handle and register query params
-                // Issue URL: https://github.com/PapaLeoneIV/42WebServer/issues/39
                 continue;
             }
 
@@ -169,7 +109,7 @@ int Request::consume(std::string buffer)
                 continue;
             }
             // se arriviamo qui, il carattere non è valido per un URL
-            Logger::error("Parser", "Bad character in URL: '" + std::string(1, character) + "', ASCII: " + intToStr(static_cast<int>(character)));
+            Logger::error("ResourceValidator", "Bad character in URL: '" + std::string(1, character) + "', ASCII: " + wb_itos(static_cast<int>(character)));
             this->error = 400;
             this->state = StateParsingError;
             return 1;
@@ -177,14 +117,13 @@ int Request::consume(std::string buffer)
         case StateUrlQuery:
         {
             this->raw += character;
+            this->content += character;
             if (character == ' ')
             {
                 this->setQueryParam(this->content);
-                this->content += character;
                 this->state = StateSpaceAfterUrl;
                 continue;
             }
-            this->content += character;
             continue;
         }
         case StateEncodedSep:
@@ -195,10 +134,10 @@ int Request::consume(std::string buffer)
             {
                 this->encoded_char += character;
 
-                int hex = strToHex(this->encoded_char);
+                int hex = wb_stox(this->encoded_char);
                 if (hex == 0x0)
                 {
-                    this->error = 400; // request not valid
+                    this->error = 400; // req not valid
                     this->state = StateParsingError;
                     return 1;
                 }
@@ -221,7 +160,7 @@ int Request::consume(std::string buffer)
             this->raw += character;
             if (character != 'H')
             {
-                this->error = 400; // request not valid
+                this->error = 400; // req not valid
                 this->state = StateParsingError;
                 return 1;
             }
@@ -388,32 +327,6 @@ int Request::consume(std::string buffer)
             this->state = StateHeaderValue;
             continue;
         }
-        // case StateHeaderValue: {
-        //     this->raw += character;
-        //     if(character == ' ')
-        //     {
-        //         this->headers[to_lower(this->headers_key)] = to_lower(this->content);
-        //         this->content.clear();
-        //         this->state = StateHeadersTrailingSpaceEnd;
-        //         continue;
-        //     }
-        //     if(character == '\r')
-        //     {
-        //         this->headers[to_lower(this->headers_key)] = to_lower(this->content);
-        //         this->content.clear();
-        //         this->state = StateHeaders_CR;
-        //         continue;
-        //     }
-        //     if(character < 32 || character > 126) //non printable chars
-        //     {
-        //         this->error = 400; //Bad Request
-        // 		this->state = StateParsingError;
-        //         return 1;
-        //     }
-        //     this->content += character;
-        //     continue;
-
-        // }
         case StateHeaderValue:
         {
             this->raw += character;
@@ -483,13 +396,13 @@ int Request::consume(std::string buffer)
         case StateHeadersEnd_CR:
         {
             this->raw += character;
-            if(this->method == "POST")
-            if (character != '\n')
-            {
-                this->error = 400; // Bad Request
-                this->state = StateParsingError;
-                return 1;
-            }
+            if (this->method == "POST")
+                if (character != '\n')
+                {
+                    this->error = 400; // Bad Request
+                    this->state = StateParsingError;
+                    return 1;
+                }
             if (!this->headers["content-length"].empty())
             {
                 this->has_body = true;
@@ -518,12 +431,12 @@ int Request::consume(std::string buffer)
             this->raw += character;
             this->body_counter++;
             this->body += character;
-            if (this->body_counter == strToInt(this->headers["content-length"]))
+            if (this->body_counter == wb_stoi(this->headers["content-length"]))
             {
                 this->state = StateParsingComplete;
                 continue;
             }
-            if (this->body_counter < strToInt(this->headers["content-length"]))
+            if (this->body_counter < wb_stoi(this->headers["content-length"]))
             {
                 continue;
             }
@@ -634,7 +547,7 @@ int Request::consume(std::string buffer)
             {
                 return 1;
             }
-            Logger::info("Parser: Parsing complete. Method: " + this->method + ", URL: " + this->url);
+            Logger::info("ResourceValidator: Parsing complete. Method: " + this->method + ", URL: " + this->url);
             return 0;
         }
 
@@ -647,17 +560,7 @@ int Request::consume(std::string buffer)
     return 1;
 }
 
-void Request::printHeaders()
-{
-    std::string headers = "";
-    for (std::map<std::string, std::string>::iterator it = this->headers.begin(); it != this->headers.end(); ++it)
-    {
-        headers += it->first + ": " + it->second + "\n";
-        std::cout << it->first << " : " << it->second << std::endl;
-    }
-}
-
-void Request::print_Request()
+void Request::print()
 {
     std::cout << "Is Chunked: " << (this->is_chunked ? "true" : "false") << std::endl;
     std::cout << "State: " << this->state << std::endl;
@@ -696,7 +599,7 @@ void Request::reset(void)
     this->headers_key.clear();
 }
 
-int Request::getBodyCounter() { return this->body_counter; }
+int Request::getBodyCounter() const { return this->body_counter; }
 
 void Request::setBodyCounter(int bodyCounter) { this->body_counter = bodyCounter; }
 
@@ -704,7 +607,7 @@ int Request::getState() { return this->state; };
 
 std::string &Request::getUrl() { return this->url; }
 
-int Request::getError() { return this->error; };
+int Request::getError() const { return this->error; };
 
 std::string &Request::getMethod() { return this->method; }
 
@@ -712,11 +615,7 @@ std::string &Request::getVersion() { return this->version; }
 
 std::string &Request::getBody() { return this->body; };
 
-std::string Request::getRaw(){return this->raw;};
-
 std::map<std::string, std::string> &Request::getHeaders() { return this->headers; }
-
-bool &Request::hasBody() { return this->has_body; }
 
 void Request::setError(int error) { this->error = error; };
 
@@ -736,45 +635,20 @@ void Request::setQueryParam(std::string &query_param) { this->query_param = quer
 
 std::string &Request::getQueryParam() { return this->query_param; };
 
-bool Request::getHasBody(){return this->has_body;};
+bool Request::getHasBody() const { return this->has_body; };
 
-void Request::flush()
-{
-    // sempliocity for the moment
-    this->headers.clear();
-    this->raw = "";
-    this->state = 0;
-    this->method = "";
-    this->url = "";
-    this->version = "";
-    this->body = "";
-    this->content = "";
-    this->has_body = false;
-    this->is_chunked = false;
-    this->error = 0;
-
-    this->number = 0;
-    this->body_counter = 0;
-    this->encoded_counter = 0;
-    this->encoded_char = "";
-    this->headers_key = "";
-    this->methods.clear();
-}
-Request::~Request()
-{
-    Logger::info("Request Destructor Called()");
-};
+Request::~Request() {};
 
 Request::Request()
     : state(StateMethod),
       has_body(false),
       is_chunked(false),
       error(0),
-      number(0),
       body_counter(0),
+      number(0),
       encoded_counter(0)
 {
-    // servono nel parsing della request
+    // servono nel parsing della req
     this->methods[GET] = "GET";
     this->methods[POST] = "POST";
     this->methods[DELETE] = "DELETE";

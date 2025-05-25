@@ -1,6 +1,6 @@
 #include "../../includes/ServerManager.hpp"
 #include "../../includes/Booter.hpp"
-#include "../../includes/Parser.hpp"
+#include "../../includes/ResourceValidator.hpp"
 #include "../../includes/Request.hpp"
 #include "../../includes/Response.hpp"
 #include "../../includes/Server.hpp"
@@ -8,75 +8,62 @@
 #include "../../includes/Utils.hpp"
 #include "../../includes/Logger.hpp"
 
-Client *ServerManager::getClient(SOCKET clientFd){
-    
-    if (this->_clients_map.count(clientFd) > 0){
-        return this->_clients_map[clientFd];
-    }
-    return new Client(clientFd);
-}
+std::vector<Server> ServerManager::getServerMap() { return this->servers; }
+
+void ServerManager::addServer(Server &server){this->servers.push_back(server);}
+
+void ServerManager::addToSet(SOCKET fd, fd_set *fdSet){ FD_SET(fd, fdSet); this->maxSocket = std::max(this->maxSocket, fd);}
 
 void ServerManager::removeClient(SOCKET fd){
-    if (this->_clients_map.count(fd) > 0) {
-        delete this->_clients_map[fd];
-        this->_clients_map.erase(fd);
+    if (this->clients.count(fd) > 0) {
+        delete this->clients[fd];
+        this->clients.erase(fd);
     }
-    if(FD_ISSET(fd, &this->_masterPool)){
-        removeFromSet(fd, &this->_masterPool);
+    if(FD_ISSET(fd, &this->masterPool)){
+        removeFromSet(fd, &this->masterPool);
     }
     shutdown(fd, SHUT_RDWR);
     close(fd);
     fd = -1;
 }
 
-void ServerManager::addServer(Server &server){
-    this->_servers_map.push_back(server);
-}
-
-void ServerManager::addToSet(SOCKET fd, fd_set *fdSet){
-    FD_SET(fd, fdSet);
-    this->_maxSocket = std::max(this->_maxSocket, fd);
-}
-
-
 void ServerManager::removeFromSet(SOCKET fd, fd_set *targetSet) {
     FD_CLR(fd, targetSet);
 
-    if (fd == this->_maxSocket) {
+    if (fd == this->maxSocket) {
         SOCKET newMax = 0;
-        for (SOCKET i = this->_maxSocket - 1; i >= 0; --i) {
-            if (FD_ISSET(i, &this->_readPool) || FD_ISSET(i, &this->_writePool)) {
+        for (SOCKET i = this->maxSocket - 1; i >= 0; --i) {
+            if (FD_ISSET(i, &this->readPool) || FD_ISSET(i, &this->writePool)) {
                 newMax = i;
                 break;
             }
         }
-        this->_maxSocket = newMax;
+        this->maxSocket = newMax;
     }
 }
 
-
-const std::string ServerManager::getClientIP(Client *client){
+const std::string ServerManager::getClientIP(Client *c){
     static char address_info[INET6_ADDRSTRLEN];
-    getnameinfo((sockaddr*)&client->getAddr(), client->getAddrLen(), address_info, sizeof(address_info), 0, 0, NI_NUMERICHOST);
+    getnameinfo((sockaddr*)&c->getAddr(), c->getAddrLen(), address_info, sizeof(address_info), 0, 0, NI_NUMERICHOST);
     return std::string(address_info);
 }
 
-void ServerManager::closeClientConnection(SOCKET fd, Client* client) 
+void ServerManager::closeClientConnection(SOCKET fd, Client* c) 
 {
-    if (client == NULL) {
+    if (c == NULL) {
         if (fd != -1) {
-            removeFromSet(fd, &this->_masterPool);
-            removeFromSet(fd, &this->_readPool);
-            removeFromSet(fd, &this->_writePool);
+            removeFromSet(fd, &this->masterPool);
+            removeFromSet(fd, &this->readPool);
+            removeFromSet(fd, &this->writePool);
             shutdown(fd, SHUT_RDWR);
             close(fd);
         }
         return;
     }
 
-    removeFromSet(fd, &this->_masterPool);
-    removeFromSet(fd, &this->_readPool);
-    removeFromSet(fd, &this->_writePool);
+    removeFromSet(fd, &this->masterPool);
+    removeFromSet(fd, &this->readPool);
+    removeFromSet(fd, &this->writePool);
     
     int socket_status;
     socklen_t len = sizeof(socket_status);
@@ -88,119 +75,118 @@ void ServerManager::closeClientConnection(SOCKET fd, Client* client)
             Logger::error("ServerManager", "Error closing socket: " + std::string(strerror(errno)));
         }
     } else {
-        Logger::info("Socket already closed [" + intToStr(fd) + "]");
+        Logger::info("Socket already closed [" + wb_itos(fd) + "]");
     }
-    this->_clients_map.erase(fd);
-    delete client;
+    this->clients.erase(fd);
+    delete c;
     
 }
-
 
 void ServerManager::handleClientTimeout(time_t currentTime) {
     std::vector<SOCKET> clientsToRemove;
     
-    for (std::map<SOCKET, Client*>::iterator it = this->_clients_map.begin(); it != this->_clients_map.end(); ++it) {
-        Client* client = it->second;
-        if (currentTime - client->getLastActivity() > TIMEOUT_SEC) {
+    for (std::map<SOCKET, Client*>::iterator it = this->clients.begin(); it != this->clients.end(); ++it) {
+        Client* c = it->second;
+        if (currentTime - c->getLastActivity() > TIMEOUT_SEC) {
             clientsToRemove.push_back(it->first);
         }
     }
     
     for (std::vector<SOCKET>::iterator it = clientsToRemove.begin(); it != clientsToRemove.end(); ++it) {
         SOCKET fd = *it;
-        Client* client = this->_clients_map[fd];
-        Logger::info("Connection timeout, closing connection [" + intToStr(fd) + "]");
-        this->closeClientConnection(fd, client);
+        Client* c = this->clients[fd];
+        Logger::info("Connection timeout, closing connection [" + wb_itos(fd) + "]");
+        this->closeClientConnection(fd, c);
     }
 }
 
 void ServerManager::initFdSets()
 {
-    for (size_t i = 0; i < this->_servers_map.size(); i++){
-        SOCKET serverSocket = this->_servers_map[i].getServerSocket();
+    FD_ZERO(&this->readPool);
+    FD_ZERO(&this->writePool);
+    
+    for (size_t i = 0; i < this->servers.size(); i++){
+        SOCKET serverSocket = this->servers[i].getServerSocket();
         
-        this->addToSet(serverSocket, &this->_masterPool);
-        this->addToSet(serverSocket, &this->_readPool);
+        this->addToSet(serverSocket, &this->masterPool);
+        this->addToSet(serverSocket, &this->readPool);
         
-        if (serverSocket > this->_maxSocket){
-            this->_maxSocket = serverSocket;
+        if (serverSocket > this->maxSocket){
+            this->maxSocket = serverSocket;
         }
     }
     std::map<SOCKET, Client *>::iterator it;
-    for (it = this->_clients_map.begin(); it != this->_clients_map.end(); ++it){
+    for (it = this->clients.begin(); it != this->clients.end(); ++it){
         SOCKET clientSocket = it->first;
-        Client *client = it->second;
+        Client *c = it->second;
 
-        this->addToSet(clientSocket, &this->_masterPool);
+        this->addToSet(clientSocket, &this->masterPool);
         
-        Request *req = client->getRequest();
+        Request *req = c->getRequest();
         if (req && (req->getState() == StateParsingComplete || req->getState() == StateParsingError)){
-            this->addToSet(clientSocket, &this->_writePool);
-        } else {
-            this->addToSet(clientSocket, &this->_readPool);
+            this->addToSet(clientSocket, &this->writePool);}
+        else { 
+            this->addToSet(clientSocket, &this->readPool);
         }
         
-        if (clientSocket > this->_maxSocket){
-            this->_maxSocket = clientSocket;
-        }
+        if (clientSocket > this->maxSocket){ this->maxSocket = clientSocket;}
 
-        Cgi& cgi = client->getCgiObj();
-            if (cgi.getCGIState() == 1){
-                int cgiIn = cgi.getPipeIn()[1];
-                int cgiOut = cgi.getPipeOut()[0];
-                
-                if (cgiIn >= 0 && fcntl(cgiIn, F_GETFD) != -1)
-                this->addToSet(cgiIn, &this->_writePool);
-                if (cgiOut >= 0 && fcntl(cgiOut, F_GETFD) != -1)
-                this->addToSet(cgiOut, &this->_readPool);
-                
-                if (cgiIn > this->_maxSocket)
-                this->_maxSocket = cgiIn;
-                if (cgiOut > this->_maxSocket)
-                this->_maxSocket = cgiOut;
+        Cgi& cgi = c->getCgiObj();
+        if (cgi.getCGIState() == 1){
+            int cgiIn = cgi.getPipeIn()[1];
+            int cgiOut = cgi.getPipeOut()[0];
+            
+            if (cgiIn >= 0 && fcntl(cgiIn, F_GETFD) != -1)
+                this->addToSet(cgiIn, &this->writePool);
+            if (cgiOut >= 0 && fcntl(cgiOut, F_GETFD) != -1)
+                this->addToSet(cgiOut, &this->readPool);
+            
+            if (cgiIn > this->maxSocket)
+                this->maxSocket = cgiIn;
+            if (cgiOut > this->maxSocket)
+                this->maxSocket = cgiOut;
         }
     }
 }
 
-void ServerManager::assignServer(Client *client){
+void ServerManager::assignServer(Client *c){
 
-    Request *request = client->getRequest();
+    Request *req = c->getRequest();
 
-    if (request->getHeaders().find("host") != request->getHeaders().end()){
+    if (req->getHeaders().find("host") != req->getHeaders().end()){
 
-        const std::string reqPort = request->getHeaders()["host"].find_last_of(":") != std::string::npos
-            ? request->getHeaders()["host"].substr(request->getHeaders()["host"].find_last_of(":") + 1, request->getHeaders()["host"].size())
+        const std::string reqPort = req->getHeaders()["host"].find_last_of(":") != std::string::npos
+            ? req->getHeaders()["host"].substr(req->getHeaders()["host"].find_last_of(":") + 1, req->getHeaders()["host"].size())
             : "80";
 
-        const std::string reqHost = request->getHeaders()["host"].find_last_of(":") != std::string::npos
-            ? request->getHeaders()["host"].substr(0, request->getHeaders()["host"].find_last_of(":"))
-            : request->getHeaders()["host"];
+        const std::string reqHost = req->getHeaders()["host"].find_last_of(":") != std::string::npos
+            ? req->getHeaders()["host"].substr(0, req->getHeaders()["host"].find_last_of(":"))
+            : req->getHeaders()["host"];
 
         const std::string reqHostPort = reqHost + ":" + reqPort;
-        for (size_t i = 0; i < this->_servers_map.size(); i++){
-            std::map<std::string, std::vector<std::string> > serverDir = this->_servers_map[i].getServerDir();
-            if (serverDir.find("server_name") != serverDir.end() && serverDir["server_name"][0] == request->getHeaders()["host"] && this->_servers_map[i].getHostPortKey() == reqHostPort){
-                client->setServer(&this->_servers_map[i]);
-                break;
-            }
+        for (size_t i = 0; i < this->servers.size(); i++){
+            std::map<std::string, std::vector<std::string> > serverDir = this->servers[i].getServerDir();
+            if (serverDir.find("server_name") != serverDir.end() &&
+                serverDir["server_name"][0] == reqHost &&
+                serverDir.find("listen") != serverDir.end() &&
+                serverDir["listen"][0] == reqPort){
+                    c->setServer(&this->servers[i]);
+                    break;
+                }
         }
     }
 }
 
-std::vector<Server> ServerManager::getServerMap(void) { return this->_servers_map; }
 
-ServerManager::ServerManager()
-{
-    this->_maxSocket = 0;
-    FD_ZERO(&this->_readPool);
-    FD_ZERO(&this->_writePool);
-    FD_ZERO(&this->_masterPool);
+ServerManager::ServerManager(){
+    this->maxSocket = 0;
+    FD_ZERO(&this->readPool);
+    FD_ZERO(&this->writePool);
+    FD_ZERO(&this->masterPool);
 
     timeout.tv_sec = 5;
     timeout.tv_usec = 0;
+    fdsChanged = 0;
 }
 
-ServerManager::~ServerManager()
-{
-    Logger::info("ServerManager Destructor() Called!!!");
-}
+ServerManager::~ServerManager(){}

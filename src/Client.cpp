@@ -28,7 +28,7 @@ int &Client::getRecvBytes() {return this->_received;}
 
 Server *    Client::getServer() {return this->_server;}
 
-std::string Client::getHeadersData() {return this->_headersData;}
+std::string Client::getHeadersData() {return this->headersData;}
 
 std::string Client::getBodyData() {return this->_bodyData;}
 
@@ -38,9 +38,9 @@ void Client::setIsCgiRequest(bool innit){this->isCGIRequest = innit;}
 
 void Client::setCgiObj(Cgi cgi_obj) {this->_cgi_obj = cgi_obj;}
 
-void    Client::setHeadersData(std::string headersData) {this->_headersData = headersData;}
+void    Client::setHeadersData(const std::string &headersData) {this->headersData = headersData;}
 
-void    Client::setBodyData(std::string bodyData) {this->_bodyData = bodyData;}
+void    Client::setBodyData(const std::string &bodyData) {this->_bodyData = bodyData;}
 
 void    Client::setAddr(sockaddr_storage addr) {this->_address = addr;}
 
@@ -52,7 +52,7 @@ void    Client::set_Request(class Request *_Request){this->_Request = _Request;}
 
 void    Client::set_Response(class Response *_Response){this->_Response = _Response;} 
 
-void    Client::setRequestData(std::string requestData){this->_requestData = requestData;}
+void    Client::setRequestData(const std::string& requestData){this->_requestData = requestData;}
 
 void    Client::setRecvData(int bytes) {this->_received = bytes;}
 
@@ -71,14 +71,14 @@ void Client::reset() {
     }
     
     this->_requestData = "";
-    this->_headersData = "";
+    this->headersData = "";
     this->_bodyData = "";
     this->_received = 0;
     this->_content_length = 0;
     
     this->updateLastActivity();
     
-    Logger::info("Client state reset for keep-alive connection [" + intToStr(this->_socket) + "]");
+    Logger::info("Client state reset for keep-alive connection [" + wb_itos(this->_socket) + "]");
 }
 
 Client::Client() {
@@ -87,37 +87,23 @@ Client::Client() {
     this->_server = NULL;
     memset(&this->_address, 0, sizeof(this->_address));
     this->_address_length = sizeof(this->_address);
-    this->_socket = 0;
+    this->_socket = -1;
     this->_requestData = "";
-    this->_headersData = "";
+    this->headersData = "";
     this->_bodyData = "";
     this->_received = 0;
     this->_last_activity = time(NULL);
     this->isCGIRequest = 0;
 };
 
-Client::Client(SOCKET fd) {
-    this->_Request = new Request();
-    this->_Response = new Response();
-    this->_server = NULL;
-    memset(&this->_address, 0, sizeof(this->_address));
-    this->_address_length = sizeof(this->_address);
-    this->_socket = fd;
-    this->_requestData = "";
-    this->_headersData = "";
-    this->_bodyData = "";
-    this->_received = 0;
-    this->_last_activity = time(NULL);
-    this->isCGIRequest = 0;
-};
 
 Client::~Client(){
   static char address_info[INET6_ADDRSTRLEN];
   int x = getnameinfo((sockaddr*)&this->getAddr(), this->getAddrLen(), address_info, sizeof(address_info), NULL, 0, NI_NUMERICHOST);
   if (x != 0) {
-    Logger::error("Client", "Error getting client address: " + std::string(gai_strerror(x)));
+    Logger::error("Client", "Error getting c address: " + std::string(gai_strerror(x)));
   } else {
-    Logger::info("Connection closed from " + std::string(address_info) + " [" + intToStr(this->getSocketFd()) + "]");
+    Logger::info("Connection closed from " + std::string(address_info) + " [" + wb_itos(this->getSocketFd()) + "]");
   }
   if(this->_Request)
     delete this->_Request;

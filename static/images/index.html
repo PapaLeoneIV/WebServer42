@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Random Image Viewer</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 2rem;
+      background-color: #f5f5f5;
+    }
+    img {
+      max-width: 90%;
+      max-height: 70vh;
+      margin-top: 2rem;
+      border: 2px solid #ccc;
+    }
+    button {
+      padding: 1rem 2rem;
+      font-size: 1.2rem;
+      cursor: pointer;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Random JPG Viewer</h1>
+  <button onclick="showRandomImage()">Show Random Image</button>
+  <div>
+    <img id="randomImage" src="" alt="Random Image" style="display:none;" />
+  </div>
+
+  <script>
+    const images = [
+      "plane.jpg",
+      "tiny.jpg",
+      "zebra.jpg",
+      "luci.jpg",
+      "barche.jpg"
+    ];
+
+    function showRandomImage() {
+      const index = Math.floor(Math.random() * images.length);
+      const img = document.getElementById("randomImage");
+      img.src = images[index];
+      img.style.display = "block";
+    }
+  </script>
+
+</body>
+</html>

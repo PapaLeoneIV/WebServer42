@@ -5,47 +5,47 @@
 #include <map>
 
 typedef int SOCKET;
-class Response{
-    
-    public:
 
+class Response {
+public:
+    // Constructors & Destructor
     Response();
-    Response(int status, const char *status_message);
-    Response(int status, std::string status_message);
+    Response(int status, const char* status_message);
+    Response(int status, const std::string& status_message);
     ~Response();
 
+    // Core Methods
     void print();
     void prepareResponse();
     void fillStatusLine();
-    void fillHeader  (std::string headerKey, std::string headerValue);
-    
-    //GETTERS
-    std::string &getResponse();
-    std::string &getBody();
-    std::string &getContentType();
-    std::string &getStatusMessage();
-    int  &getStatus();
-    std::map<std::string, std::string>  &getHeaders();
-    
-    //SETTERS
-    void setResponse (char *response);
-    void setBody (std::string body);
-    void setContentType(std::string content_type);
-    void setStatusMessage(std::string status_message);
-    void setStatusCode (int status);
+    void fillHeader(const std::string& headerKey, const std::string& headerValue);
+
+    // Getters
+    std::string& getResponse();
+    std::string& getBody();
+    std::string& getContentType();
+    std::string& getStatusMessage();
+    int& getStatus();
+    std::map<std::string, std::string>& getHeaders();
+
+    // Setters
+    void setResponse(const char* resp);
+    void setBody(const std::string& body);
+    void setContentType(const std::string& content_type);
+    void setStatusMessage(const std::string& status_message);
+    void setStatusCode(int status);
     void setHeaders(std::string key, std::string value);
+
+    // Utilities
     void reset();
-    void flush();
 
-    private:
-
-    std::string                         _finalResponse;
-    std::map<std::string, std::string>  _headers;
-    std::string                         _body;
-    std::string                         _content_type; 
-    std::string                         _status_message; 
-    int                                 _status;
+private:
+    std::string                         finalResponse;
+    std::map<std::string, std::string>  headers;
+    std::string                         body;
+    std::string                         contentType;
+    std::string                         statusMessage;
+    int                                 status;
 };
 
-
-#endif
+#endif // RESPONSE_HPP

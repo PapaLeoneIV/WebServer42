@@ -1,78 +1,84 @@
 #ifndef CLIENTS_HPP
 #define CLIENTS_HPP
 
-
 #include <string>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <ctime>
+
 #include "Cgi.hpp"
+
 class Server;
 class Request;
 class Response;
-class Cgi;
 
 typedef int SOCKET;
 
-class Client{
-
-    public:
-
+class Client {
+public:
+    // Constructors & Destructor
     Client();
-    Client(SOCKET fd);
-
     ~Client();
-    
-    //GETTERS
-    Cgi &getCgiObj();
-    Response    *getResponse();
-    Request *getRequest();
-    sockaddr_storage    &getAddr();
-    socklen_t   &getAddrLen();
-    SOCKET  &getSocketFd();
+
+    // Getters
+    Cgi&            getCgiObj();
+    Request*        getRequest();
+    Response*       getResponse();
+    sockaddr_storage& getAddr();
+    socklen_t&      getAddrLen();
+    SOCKET&         getSocketFd();
     std::string     getRequestData();
-    int     &getRecvBytes();
-    Server*     getServer(); 
     std::string     getHeadersData();
     std::string     getBodyData();
-    int     getContentLength();
-    time_t  getLastActivity();
-    bool isCgiRequest();
-    //SETTERS
-    void setCgiObj(Cgi cgi_obj);
-    void    set_Request(Request *request);
-    void    set_Response(Response *response);
-    void    setAddr(sockaddr_storage addr); 
-    void    setAddrLen(socklen_t len);
-    void    setSocketFd(SOCKET fd);
-    void    setRequestData(std::string requestData);
-    void    setRecvData(int bytes);
-    void    setServer(Server *server);
-    void    setHeadersData(std::string headersData);
-    void    setBodyData(std::string bodyData);
-    void    setContentLength(int content_length); 
-    void    updateLastActivity(void);
-    void    reset(void);
-    void    setIsCgiRequest(bool innit);
-                            
-    private:
-    Request *_Request;
-    Response    *_Response;
-    Cgi _cgi_obj;
+    int             getContentLength();
+    int&            getRecvBytes();
+    Server*         getServer();
+    time_t          getLastActivity();
+    bool            isCgiRequest();
 
-    Server  *_server;
-    
+    // Setters
+    void            setCgiObj(Cgi cgi_obj);
+    void            set_Request(Request* req);
+    void            set_Response(Response* resp);
+    void            setAddr(sockaddr_storage addr); 
+    void            setAddrLen(socklen_t len);
+    void            setSocketFd(SOCKET fd);
+    void            setRequestData(const std::string& requestData);
+    void            setHeadersData(const std::string& headersData);
+    void            setBodyData(const std::string& bodyData);
+    void            setContentLength(int contentLength); 
+    void            setRecvData(int bytes);
+    void            setServer(Server* server);
+    void            updateLastActivity();
+    void            setIsCgiRequest(bool value);
+    void            reset();
+
+private:
+    // Request handling
+    Request*        _Request;
+    Response*       _Response;
+    Cgi             _cgi_obj;
+
+    // Connection metadata
+    Server*             _server;
     sockaddr_storage    _address;
-    socklen_t   _address_length;
-    SOCKET  _socket;
-    std::string _requestData;
-    std::string _headersData;
-    std::string _bodyData; 
-    int _content_length;
-    int _received;
-    time_t  _last_activity;
-    bool isCGIRequest;
+    socklen_t           _address_length;
+    SOCKET              _socket;
+
+    // Request data
+    std::string     _requestData;
+    std::string     headersData;
+    std::string     _bodyData;
+
+    // Request state
+    int             _content_length;
+    int             _received;
+    bool            isCGIRequest;
+
+    // Activity tracking
+    time_t          _last_activity;
 };
 
-#endif
+#endif // CLIENTS_HPP

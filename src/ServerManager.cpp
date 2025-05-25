@@ -1,5 +1,5 @@
 #include "../includes/Booter.hpp"
-#include "../includes/Parser.hpp"
+#include "../includes/ResourceValidator.hpp"
 #include "../includes/Request.hpp"
 #include "../includes/Response.hpp"
 #include "../includes/Server.hpp"
@@ -17,8 +17,7 @@
 volatile sig_atomic_t shutdown_requested = 0;
 static void handle_signal(int signal)
 {
-    if (signal == SIGINT || signal == SIGTERM)
-    {
+    if (signal == SIGINT || signal == SIGTERM){
         Logger::info("Signal received, Shutting down server gracefully...");
         shutdown_requested = 1;
     }
@@ -30,84 +29,71 @@ void ServerManager::eventLoop()
     std::signal(SIGTERM, handle_signal);
     while (!shutdown_requested)
     {
-        int fds_changed = 0;
-
-        FD_ZERO(&this->_readPool);
-        FD_ZERO(&this->_writePool);
-
         this->initFdSets();
 
-        memset(&timeout, 0, sizeof(timeout));
-        timeout.tv_sec = 5;
-        timeout.tv_usec = 0;
+        memset(&this->timeout, 0, sizeof(this->timeout));
+        this->timeout.tv_sec = 5;
+        this->timeout.tv_usec = 0;
 
         time_t currentTime = time(NULL);
         this->handleClientTimeout(currentTime);
 
-        if ((fds_changed = select(this->_maxSocket + 1, &this->_readPool, &this->_writePool, 0, &timeout)) < 0)
-        {
-            Logger::info("Select: interrupted");
+        if ((this->fdsChanged = select(this->maxSocket + 1, &this->readPool, &this->writePool, 0, &this->timeout)) < 0){
+            Logger::info("select(): interrupted");
             continue;
         }
-        if (fds_changed == 0)
+        if (this->fdsChanged == 0)
             continue;
 
-        for (SOCKET fd = 0; fd <= this->_maxSocket; ++fd)
+        for (SOCKET fd = 0; fd <= this->maxSocket; ++fd)
         {
-
             bool clientRegistred = false;
-            for (size_t i = 0; i < this->_servers_map.size(); i++)
+            for (size_t i = 0; i < this->servers.size(); i++)
             {
-                if (FD_ISSET(fd, &this->_readPool) && this->_servers_map[i].getServerSocket() == fd && !clientRegistred){
-                    this->registerNewConnections(fd, &this->_servers_map[i]);
+                if (FD_ISSET(fd, &this->readPool) && this->servers[i].getServerSocket() == fd && !clientRegistred){
+                    this->registerNewConnections(fd, &this->servers[i]);
                     clientRegistred = true;
                 }
             }
-            if (FD_ISSET(fd, &this->_readPool) && this->_clients_map.count(fd) > 0){
-                this->processRequest(this->_clients_map[fd]);
+            if (FD_ISSET(fd, &this->readPool) && this->clients.count(fd) > 0){
+                this->processRequest(this->clients[fd]);
             }
-            else if (FD_ISSET(fd, &this->_writePool) && this->_clients_map.count(fd) > 0){
-                Cgi& cgi_obj = this->_clients_map[fd]->getCgiObj();
-                int cgi_state = cgi_obj.getCGIState();
-                if (cgi_state == 1 && FD_ISSET(cgi_obj.getPipeIn()[1], &this->_writePool))
-                    sendCgiBody(fd, _clients_map[fd], cgi_obj);
-                else if (cgi_state == 1 && FD_ISSET(cgi_obj.getPipeOut()[0], &this->_readPool))
-                    readCgiBody(fd, _clients_map[fd], cgi_obj);
-                else if ((cgi_state == 0 || cgi_state == 2) && FD_ISSET(fd, &this->_writePool))
-                    this->sendResponse(fd, this->_clients_map[fd]);
+            else if (FD_ISSET(fd, &this->writePool) && this->clients.count(fd) > 0){
+                Cgi& cgi_obj = this->clients[fd]->getCgiObj();
+                int state = cgi_obj.getCGIState();
+                if (state == 1 && FD_ISSET(cgi_obj.getPipeIn()[1], &this->writePool))
+                    sendCgiBody(fd, clients[fd], cgi_obj);
+                else if (state == 1 && FD_ISSET(cgi_obj.getPipeOut()[0], &this->readPool))
+                    readCgiBody(fd, clients[fd], cgi_obj);
+                else if ((state == 0 || state == 2) && FD_ISSET(fd, &this->writePool))
+                    this->sendResponse(fd, this->clients[fd]);
             }
         }
     }
-    return;
 }
 
-void ServerManager::sendCgiBody(SOCKET fd, Client *client, Cgi &cgi_obj)
+void ServerManager::sendCgiBody(SOCKET fd, Client *c, Cgi &cgi_obj)
 {
-    Request *request = client->getRequest();
-    Response *response = client->getResponse();
-    if (!request || !response)
-    {
-        Logger::error("ServerManager", "Invalid request or response state [" + intToStr(fd) + "]");
-        return;
-    }
-
-    size_t total = request->getBody().length();
+    Request *req = c->getRequest();
+    Response *resp = c->getResponse();
+   
+    size_t total = req->getBody().length();
     size_t sent = cgi_obj.getBytesSended();
     if (sent >= total)
     {
-        removeFromSet(cgi_obj.getPipeIn()[1], &this->_writePool);
+        removeFromSet(cgi_obj.getPipeIn()[1], &this->writePool);
         close(cgi_obj.getPipeIn()[1]);
         return;
     }
-    Logger::info("Sending body to CGI process");
-    ssize_t bytes_sent = write(cgi_obj.getPipeIn()[1], request->getBody().c_str() + sent, total - sent);
+    Logger::info("Sending body to CGI process ["  + wb_itos(fd) + "]");
+    ssize_t bytes_sent = write(cgi_obj.getPipeIn()[1], req->getBody().c_str() + sent, total - sent);
     if (bytes_sent < 0)
     {
         Logger::error(__FILE__, "sendCgiBody() Error while sending CGI data to CGI process");
-        removeFromSet(cgi_obj.getPipeIn()[1], &this->_writePool);
+        removeFromSet(cgi_obj.getPipeIn()[1], &this->writePool);
         close(cgi_obj.getPipeIn()[1]);
-        response->setStatusCode(500);
-        response->setBody(getErrorPage(response->getStatus(), client->getServer()));
+        resp->setStatusCode(500);
+        resp->setBody(getErrorPage(resp->getStatus(), c->getServer()));
     }
     else
     {
@@ -115,175 +101,165 @@ void ServerManager::sendCgiBody(SOCKET fd, Client *client, Cgi &cgi_obj)
         if (cgi_obj.getBytesSended() == total)
         {
             Logger::info("Body fully sent to CGI Process.");
-            removeFromSet(cgi_obj.getPipeIn()[1], &this->_writePool);
+            removeFromSet(cgi_obj.getPipeIn()[1], &this->writePool);
             close(cgi_obj.getPipeIn()[1]);
         }
     }
 }
 
-void ServerManager::readCgiBody(SOCKET fd, Client *client, Cgi &cgi_obj)
+void ServerManager::readCgiBody(SOCKET fd, Client *c, Cgi &cgi_obj)
 {
-    Request *request = client->getRequest();
-    Response *response = client->getResponse();
-    if (!request || !response)
-    {
-        Logger::error("ServerManager", "Invalid request or response state [" + intToStr(fd) + "]");
-        return;
-    }
-    Logger::info("About to read CGI response: ");
+    Response *resp = c->getResponse();
+    
     char buffer[BUFFER_SIZE + 1] = {};
     int bytes_read = read(cgi_obj.getPipeOut()[0], buffer, BUFFER_SIZE);
-    Logger::info("Bytes read from CGI: [" + intToStr(bytes_read) + std::string("]"));
-    if (bytes_read < 0)
-    {
+    Logger::info("Bytes read from CGI: [" + wb_itos(bytes_read) + "]  [" + wb_itos(fd) + "]");
+    if (bytes_read < 0){
         Logger::error(__FILE__, "readCgiBody() Error while reading CGI data from CGI process");
-        removeFromSet(cgi_obj.getPipeOut()[0], &this->_readPool);
+        resp->setStatusCode(500);
+        resp->setBody(getErrorPage(resp->getStatus(), c->getServer()));
+        removeFromSet(cgi_obj.getPipeOut()[0], &this->readPool);
         close(cgi_obj.getPipeOut()[0]);
-        response->setStatusCode(500);
-        response->setBody(getErrorPage(response->getStatus(), client->getServer()));
         return;
     }
-    else if (bytes_read == 0)
-    {
-        Logger::info("Received EOF from CGI:" + response->getBody());
-        removeFromSet(cgi_obj.getPipeOut()[0], &this->_readPool);
+    else if (bytes_read == 0){
+        removeFromSet(cgi_obj.getPipeOut()[0], &this->readPool);
         close(cgi_obj.getPipeOut()[0]);
         cgi_obj.setCGIState(2);
-    }
-    else
-    {
-        response->setBody(response->getBody() + std::string(buffer));
-        Logger::info("Chunk of CGI response: " + std::string(buffer));
+    } else {
+        resp->setBody(resp->getBody() + std::string(buffer));
     }
 }
 
 void ServerManager::registerNewConnections(SOCKET serverFd, Server *server)
 {
-    Client *client = this->getClient(-1);
-    if (client == NULL){ 
+    Client *c = new Client();
+    if (c == NULL){ 
         return;
     }
-    SOCKET new_socket = accept(serverFd, (sockaddr *)&client->getAddr(), &client->getAddrLen());
+    SOCKET new_socket = accept(serverFd, (sockaddr *)&c->getAddr(), &c->getAddrLen());
     if (new_socket < 0){
-        delete client;
+        delete c;
         return;
     }
     if (fcntl(new_socket, F_SETFL, O_NONBLOCK) < 0){
         Logger::error("ServerManager", "Error: fcntl failed");
-        delete client;
         close(new_socket);
+        delete c;
         return;
     }
 
-    Logger::info("New connection from " + this->getClientIP(client) + " [" + intToStr(new_socket) + "]");
-    client->setSocketFd(new_socket);
-    this->addToSet(new_socket, &this->_masterPool);
-    client->setServer(server);
-    client->updateLastActivity();
-    this->_clients_map[new_socket] = client;
+    Logger::info("New connection from " + this->getClientIP(c) + " [" + wb_itos(new_socket) + "]");
+    c->setSocketFd(new_socket);
+    this->addToSet(new_socket, &this->masterPool);
+    c->setServer(server);
+    c->updateLastActivity();
+    this->clients[new_socket] = c;
 }
 
-void ServerManager::processRequest(Client *client)
+void ServerManager::processRequest(Client *c)
 {
-    Request *request = client->getRequest();
-    Response *response = client->getResponse();
+    Request *req = c->getRequest();
+    Response *resp = c->getResponse();
 
     char buffer[BUFFER_SIZE + 1];
     memset(buffer, 0, sizeof(buffer));
 
-    const SOCKET fd = client->getSocketFd();
+    const SOCKET fd = c->getSocketFd();
     const int bytesRecv = recv(fd, buffer, BUFFER_SIZE, 0);
     if (bytesRecv == -1){
-        Logger::error("ServerManager", "Error in recv(): " + std::string(strerror(errno)) + " [" + intToStr(fd) + "]");
-        this->closeClientConnection(fd, client);
+        Logger::error("ServerManager", "Error in recv(): " + std::string(strerror(errno)) + " [" + wb_itos(fd) + "]");
+        this->closeClientConnection(fd, c);
         return;
     }
 
     if (bytesRecv == 0){
-        Logger::info("Client closed connection [" + intToStr(fd) + "]");
-        this->closeClientConnection(fd, client);
+        Logger::info("Client closed connection [" + wb_itos(fd) + "]");
+        this->closeClientConnection(fd, c);
         return;
     }
 
     if (bytesRecv > 0){
-        Logger::info("Received " + intToStr(bytesRecv) + " bytes [" + intToStr(fd) + "]");
+        Logger::info("Received " + wb_itos(bytesRecv) + " bytes [" + wb_itos(fd) + "]");
         std::string str(buffer, static_cast<std::string::size_type>(bytesRecv));
-        request->consume(str);
+        req->consume(str);
     }
 
-    if (request->getHasBody() && request->getBodyCounter() > MAX_REQUEST_SIZE){
-        Logger::error("ServerManager", "Request body too large [" + intToStr(fd) + "]");
-        response->setStatusCode(413);
-        request->setState(StateParsingError);
+    if (req->getHasBody() && req->getBodyCounter() > MAX_REQUEST_SIZE){
+        Logger::error("ServerManager", "Request body too large [" + wb_itos(fd) + "]");
+        resp->setStatusCode(413);
+        req->setState(StateParsingError);
         return;
     }
 
-    if (request->getState() == StateParsingComplete || request->getState() == StateParsingError){
-        Logger::info("Request was consumed assigning server [" + intToStr(fd) + "]");
-        this->assignServer(client);
-        if (request->getState() == StateParsingComplete){
-             Logger::info("Request parsing complete, validating resource [" + intToStr(fd) + "]");
-            Parser parser;
-            parser.validateResource(client, client->getServer());
-            if (response->getStatus() != 200){
-                this->removeFromSet(fd, &this->_readPool);
-                this->addToSet(fd, &this->_writePool);
-                return;
-            }
+    if (req->getState() != StateParsingComplete && req->getState() != StateParsingError)
+        return;
+
+    Logger::info("Request was consumed assigning server [" + wb_itos(fd) + "]");
+    this->assignServer(c);
+
+    if (req->getState() == StateParsingComplete) {
+        Logger::info("Request parsing complete, validating resource [" + wb_itos(fd) + "]");
+
+        ResourceValidator rv;
+        rv.validateResource(c, c->getServer());
+
+        if (resp->getStatus() != 200) {
+            this->removeFromSet(fd, &this->readPool);
+            this->addToSet(fd, &this->writePool);
+            return;
         }
-        if (client->getCgiObj().getCGIState() == 1 && request->getState() == StateParsingComplete){
-            Logger::info("Request is a CGI request [" + intToStr(fd) + "]");
-            client->setIsCgiRequest(true);
-            this->addToSet(client->getCgiObj().getPipeIn()[1], &this->_writePool);
-            this->addToSet(client->getCgiObj().getPipeOut()[0], &this->_readPool);
+
+        if (c->getCgiObj().getCGIState() == 1) {
+            Logger::info("Request is a CGI req [" + wb_itos(fd) + "]");
+            c->setIsCgiRequest(true);
+            this->addToSet(c->getCgiObj().getPipeIn()[1], &this->writePool);
+            this->addToSet(c->getCgiObj().getPipeOut()[0], &this->readPool);
         }
-        if (request->getState() == StateParsingError){
-            Logger::error("ServerManager", "Error parsing request [" + intToStr(fd) + "]");
-            response->setStatusCode(request->getError());
-            response->setBody(getErrorPage(response->getStatus(), client->getServer()));
-        }
-        this->removeFromSet(fd, &this->_readPool);
-        this->addToSet(fd, &this->_writePool);
     }
 
-    client->updateLastActivity();
+    if (req->getState() == StateParsingError) {
+        Logger::error("ServerManager", "Error parsing req [" + wb_itos(fd) + "]");
+        resp->setStatusCode(req->getError());
+        resp->setBody(getErrorPage(resp->getStatus(), c->getServer()));
+    }
+
+    this->removeFromSet(fd, &this->readPool);
+    this->addToSet(fd, &this->writePool);
+
+    c->updateLastActivity();
 }
 
-void ServerManager::sendResponse(SOCKET fd, Client *client)
+void ServerManager::sendResponse(SOCKET fd, Client *c)
 {
-    Request *request = client->getRequest();
-    Response *response = client->getResponse();
-    client->updateLastActivity();
+    Request *req = c->getRequest();
+    Response *resp = c->getResponse();
+    c->updateLastActivity();
 
-    if (!request || !response){
-        Logger::error("ServerManager", "Invalid request or response state [" + intToStr(fd) + "]");
-        return;
-    }
-
-    response->setHeaders("Host", "localhost");
-    std::string connectionHeader = to_lower(request->getHeaders()["connection"]);
-    connectionHeader == "close" ? response->setHeaders("Connection", "close") : response->setHeaders("Connection", "keep-alive");
-    if (!response->getBody().empty()){
-        response->setHeaders("Content-Type", getContentType(request->getUrl(), response->getStatus()));
-        response->setHeaders("Content-Length", intToStr(response->getBody().size()));
+    resp->setHeaders("Host", c->getServer()->getServerDir()["server_name"][0]);
+    std::string connectionHeader = to_lower(req->getHeaders()["connection"]);
+    connectionHeader == "close" ? resp->setHeaders("Connection", "close") : resp->setHeaders("Connection", "keep-alive");
+    if (!resp->getBody().empty()){
+        resp->setHeaders("Content-Type", getContentType(req->getUrl(), resp->getStatus()));
+        resp->setHeaders("Content-Length", wb_itos(resp->getBody().size()));
     } else {
-        response->setHeaders("Content-Type", "text/html");
-        response->setHeaders("Content-Length", "0");
+        resp->setHeaders("Content-Type", "text/html");
+        resp->setHeaders("Content-Length", "0");
     }
-    response->prepareResponse();
-    int bytes_sent = send(fd, response->getResponse().c_str(), response->getResponse().size(), 0);
+    resp->prepareResponse();
+    int bytes_sent = send(fd, resp->getResponse().c_str(), resp->getResponse().size(), 0);
     if (bytes_sent == -1){
-        Logger::error("ServerManager", "Send failed: " + std::string(strerror(errno)) + " [" + intToStr(fd) + "]");
-        this->closeClientConnection(fd, client);
+        Logger::error("ServerManager", "Send failed: " + std::string(strerror(errno)) + " [" + wb_itos(fd) + "]");
+        this->closeClientConnection(fd, c);
         return;
     }
-    Logger::info("Response sent successfully (" + intToStr(bytes_sent) + " bytes) [" + intToStr(fd) + "]");
+    Logger::info("Response sent successfully (" + wb_itos(bytes_sent) + " bytes) [" + wb_itos(fd) + "]");
     if (connectionHeader == "close"){
-        Logger::info("Closing connection as requested by client [" + intToStr(fd) + "]");
-        this->closeClientConnection(fd, client);
+        Logger::info("Closing connection as requested by c [" + wb_itos(fd) + "]");
+        this->closeClientConnection(fd, c);
     } else {
-        client->reset();
-        this->closeClientConnection(fd, client);
-        Logger::info("Connection kept alive for next request [" + intToStr(fd) + "]");
+        c->reset();
+        this->closeClientConnection(fd, c);
+        Logger::info("Connection kept alive for next req [" + wb_itos(fd) + "]");
     }
 }

@@ -4,71 +4,66 @@
 #include <string>
 #include <map>
 
-typedef int SOCKET;
 
-/**Request class, contains the data rappresentation that an incoming request might contain*/
-class Request{
-
+class Request {
 public:
-    
     Request();
     ~Request();
 
-    int  consume(std::string buffer);
-    void print_Request();
-    void  printHeaders();
+    // Request consumption
+    int  consume(const std::string& buffer);
     
-    //GETTERS
-    std::string &getMethod();
-    std::string &getBody();
-    int getState();
-    std::string &getUrl();
-    std::string &getVersion();
-    int getError();
-    std::map<std::string, std::string>  &getHeaders();
-    int getBodyCounter();
-    std::string &getQueryParam();
-    std::string getRaw();
-    bool getHasBody();
+    //debug
+    void print();
 
-    //SETTERS
-    void setQueryParam(std::string& query_param);
-    void  setError(int error);
-    void  setUrl(std::string& url);
-    void  setVersion(std::string& version);
-    void  setHeaders(std::map<std::string, std::string>& headers);
-    void  setBody(std::string& body);
-    void  setHasBody(bool hasBody);
-    void  setState(int state);
-    void setBodyCounter(int bodyCounter);
-    void  flush();
-    bool  &hasBody();
+    // Getters
+    std::string& getMethod();
+    std::string& getBody();
+    std::string& getUrl();
+    std::string& getVersion();
+    std::map<std::string, std::string>& getHeaders();
+    std::string& getQueryParam();
+    int getState();
+    int getError() const;
+    int getBodyCounter() const;
+    bool getHasBody() const;
+
+    // Setters
+    void setQueryParam(std::string& queryParam);
+    void setError(int errorCode);
+    void setUrl(std::string& url);
+    void setVersion(std::string& version);
+    void setHeaders(std::map<std::string, std::string>& headers);
+    void setBody(std::string& body);
+    void setHasBody(bool hasBody);
+    void setState(int state);
+    void setBodyCounter(int counter);
     void reset();
 
-    
-    private:
+private:
+    // Basic req components
+    std::string method;
     std::string url;
     std::string version;
-    std::string method;
-    std::map<std::string, std::string> headers;
     std::string query_param;
+    std::map<std::string, std::string> headers;
     std::string raw;
-    int state;
-    
     std::string body;
+
+    // Internal parsing/processing state
     std::string content;
+    int state;
     bool has_body;
     bool is_chunked;
     int error;
-    bool MultiPartHeaderFound;
-    
-    size_t number;
     int body_counter;
+
+    size_t number;
     size_t encoded_counter;
     std::string encoded_char;
     std::string headers_key;
+
     std::map<int, std::string> methods;
-    
 };
 
-#endif 
+#endif // REQUEST_HPP

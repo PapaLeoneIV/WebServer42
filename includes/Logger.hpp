@@ -3,7 +3,6 @@
 
 #include <iostream>
 
-
 class Logger {
     private:
         Logger();
@@ -12,9 +11,5 @@ class Logger {
         static void info(const std::string& message);
     
         static void error(const std::string& file, const std::string& message);
-    };
-
-
-
-        
+    };       
 #endif //LOGGER

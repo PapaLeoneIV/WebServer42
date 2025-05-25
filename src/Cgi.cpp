@@ -6,22 +6,22 @@
 #include "../includes/Utils.hpp"
 
 
-void Cgi::setArgs(std::string target, Client *client) {
-  Response *response = client->getResponse();
+void Cgi::setArgs(std::string target, Client *c) {
+  Response *resp = c->getResponse();
 
   this->args = static_cast<char **>(calloc(3, sizeof(char *)));
   if (!args) {
     Logger::error(__FILE__, "Allocating memory for args failed");
-    response->setStatusCode(500);
-    response->setBody(getErrorPage(response->getStatus(), client->getServer()));
+    resp->setStatusCode(500);
+    resp->setBody(getErrorPage(resp->getStatus(), c->getServer()));
     return;
   }
   this->args[0] = strdup(target.c_str());
   if (!args[0]) {
     free(args);
     Logger::error(__FILE__, "Allocating memory for args[0] failed");
-    response->setStatusCode(500);
-    response->setBody(getErrorPage(response->getStatus(), client->getServer()));
+    resp->setStatusCode(500);
+    resp->setBody(getErrorPage(resp->getStatus(), c->getServer()));
     return;
   }
   this->args[1] = strdup(target.c_str());
@@ -29,40 +29,38 @@ void Cgi::setArgs(std::string target, Client *client) {
     free(args[0]);
     free(args);
     Logger::error(__FILE__, "Allocating memory for args[1] failed");
-    response->setStatusCode(500);
-    response->setBody(getErrorPage(response->getStatus(), client->getServer()));
+    resp->setStatusCode(500);
+    resp->setBody(getErrorPage(resp->getStatus(), c->getServer()));
     return;
   }
   this->args[2] = NULL;
 }
 
 // https://datatracker.ietf.org/doc/html/rfc3875#section-4.1
-char **Cgi::generateEnv(Client *client, std::string exec_path) {
-  Request *request = client->getRequest();
-  Response *response = client->getResponse();
-  if (!request || !response)
+char **Cgi::generateEnv(Client *c, std::string target) {
+  Request *req = c->getRequest();
+  Response *resp = c->getResponse();
+  if (!req || !resp)
     return NULL;
 
   std::vector<std::string> env_vec;
 
   env_vec.push_back("AUTH_TYPE=Basic");
   env_vec.push_back("GATEWAY_INTERFACE=CGI/1.1");
-  env_vec.push_back("PATH_INFO=" + exec_path);
-  env_vec.push_back("PATH_TRANSLATED=" + exec_path);
-  env_vec.push_back("REQUEST_URI=" + exec_path);
+  env_vec.push_back("PATH_INFO=" + target);
+  env_vec.push_back("PATH_TRANSLATED=" + target);
+  env_vec.push_back("REQUEST_URI=" + target);
   env_vec.push_back("SERVER_SOFTWARE=URMOM");
-  env_vec.push_back("QUERY_STRING=" + request->getQueryParam());
-  env_vec.push_back("REQUEST_METHOD=" + request->getMethod());
-  env_vec.push_back("SCRIPT_FILENAME=" + exec_path);
-  env_vec.push_back("SCRIPT_NAME=" + exec_path);
+  env_vec.push_back("QUERY_STRING=" + req->getQueryParam());
+  env_vec.push_back("REQUEST_METHOD=" + req->getMethod());
+  env_vec.push_back("SCRIPT_FILENAME=" + target);
+  env_vec.push_back("SCRIPT_NAME=" + target);
   env_vec.push_back("SERVER_PROTOCOL=HTTP/1.1");
 
-  if (request->getMethod() == "POST") {
-    std::map<std::string, std::string> &headers = request->getHeaders();
-    std::string cl =
-        headers.count("content-length") ? headers["content-length"] : "";
-    std::string ct =
-        headers.count("content-type") ? headers["content-type"] : "";
+  if (req->getMethod() == "POST") {
+    std::map<std::string, std::string> &headers = req->getHeaders();
+    std::string cl = headers.count("content-length") ? headers["content-length"] : "";
+    std::string ct = headers.count("content-type") ? headers["content-type"] : "";
     env_vec.push_back("CONTENT_LENGTH=" + cl);
     env_vec.push_back("CONTENT_TYPE=" + ct);
   }
@@ -86,25 +84,25 @@ char **Cgi::generateEnv(Client *client, std::string exec_path) {
   return envp;
 }
 
-void Cgi::execute(Client *client) {
+void Cgi::execute(Client *c) {
 
-    const Request *request = client->getRequest();
-    Response *response = client->getResponse();
-    if (!request || !response)  
+    const Request *req = c->getRequest();
+    Response *resp = c->getResponse();
+    if (!req || !resp)  
         return;
 
   if (pipe(this->pipe_in) < 0) {
     Logger::error(__FILE__, "pipe() failed");
-    response->setStatusCode(500);
-    response->setBody(getErrorPage(response->getStatus(), client->getServer()));
+    resp->setStatusCode(500);
+    resp->setBody(getErrorPage(resp->getStatus(), c->getServer()));
     return;
   }
   if (pipe(this->pipe_out) < 0) {
     Logger::error(__FILE__,  "pipe() failed");
     close(pipe_in[0]);
     close(pipe_in[1]);
-    response->setStatusCode(500);
-    response->setBody(getErrorPage(response->getStatus(), client->getServer()));
+    resp->setStatusCode(500);
+    resp->setBody(getErrorPage(resp->getStatus(), c->getServer()));
     return;
   }
   this->cgi_pid = fork();
@@ -119,22 +117,14 @@ void Cgi::execute(Client *client) {
     exit(exit_status);
   }
   if (this->cgi_pid > 0) {
-        close(pipe_in[0]);
+    close(pipe_in[0]);
     close(pipe_out[1]); 
   } else {
-    response->setStatusCode(500);
-    response->setBody(getErrorPage(response->getStatus(), client->getServer()));
+    resp->setStatusCode(500);
+    resp->setBody(getErrorPage(resp->getStatus(), c->getServer()));
   }
 }
 
-
-void Cgi::freeEnv(char **envp) {
-  if (!envp )
-    return;
-  for (size_t i = 0; envp[i] != NULL; ++i)
-    free(envp[i]);
-  free(envp);
-}
 
 char **Cgi::getArgs() { return this->args; }
 
@@ -185,9 +175,6 @@ Cgi::Cgi(){
   this->bytes_sended = 0;
   cgi_pid = -1;
   pid = -1;
-
 };
-Cgi::~Cgi() {
-    reset();
-}
+Cgi::~Cgi() {reset();}
 

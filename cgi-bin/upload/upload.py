@@ -17,7 +17,7 @@ file_item = form["file"]
 
 if file_item.filename:
     filename = os.path.basename(file_item.filename)
-    with open(f"/home/papaleoneiv/Desktop/42WebServer/{filename}", "wb") as f:
+    with open(f"/home/papaleoneiv/Desktop/WebServer42/{filename}", "wb") as f:
         f.write(file_item.file.read())
     print(f"File '{filename}' uploaded successfully.")
 else:

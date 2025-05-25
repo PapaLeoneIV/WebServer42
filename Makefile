@@ -1,8 +1,8 @@
-CC = c++
+CC       = c++
+CFLAGS   = -Wall -Wextra -Werror -g --std=c++98 -I./includes -I./includes/utils
 
-CFLAGS = -Wall -Wextra -Werror -g  --std=c++98 -I./includes -I./includes/utils 
-
-TARGET = webserver
+TARGET   = webserver
+TESTER   = tester
 VALGRIND = valgrind --leak-check=full --show-leak-kinds=all
 
 SRCS = 	main.cpp \
@@ -10,7 +10,7 @@ SRCS = 	main.cpp \
 		src/Client.cpp \
 		src/Response.cpp \
 		src/Request.cpp \
-		src/Parser.cpp \
+		src/ResourceValidator.cpp \
 		src/Booter.cpp \
 		src/ServerManager.cpp \
 		src/Utils.cpp \
@@ -19,36 +19,37 @@ SRCS = 	main.cpp \
 		src/utils/utilsServerManager.cpp \
 		src/utils/utilsParser.cpp \
 		src/Treenode.cpp \
-		src/Cgi.cpp 
+		src/Cgi.cpp
 
 all: $(TARGET)
 
-tester: $(SRCS)
-	@echo "--------------------------------------------------"
-	@echo "Compiling tester..."
-	@echo "--------------------------------------------------"
-	g++ $(SRCS) -I. -I./includes -g -Wall -Wextra -Wextra --std=c++98 -o tester
+$(TARGET): $(SRCS)
+	@echo "Building $(TARGET)..."
+	$(CC) $(CFLAGS) -o $@ $^
 
-launch_test: tester
+$(TESTER): $(SRCS)
 	@echo "--------------------------------------------------"
-	@echo "Running tests for all config files..."
+	@echo "Compiling $(TESTER)..."
+	@echo "--------------------------------------------------"
+	$(CC) $(CFLAGS) -o $@ $^
+
+launch_test: $(TESTER)
+	@echo "--------------------------------------------------"
+	@echo "Running tests for all config files in ./config/invalid..."
 	@echo "--------------------------------------------------"
 	@for config_file in ./config/invalid/*.conf; do \
 		echo "Testing $$config_file..."; \
-		./tester $$config_file; \
+		./$(TESTER) $$config_file; \
 		echo "--------------------------------------------------"; \
 	done
-
-$(TARGET): $(SRCS)
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRCS)
 
 val: $(TARGET)
 	$(VALGRIND) ./$(TARGET) config/valid/example1.conf
 
 clean:
-	rm -f $(TARGET)
+	@echo "Cleaning up..."
+	rm -f $(TARGET) $(TESTER)
 
-re: clean
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRCS)
+re: clean all
 
-.PHONY: all clean testParser
+.PHONY: all clean re launch_test

@@ -5,77 +5,94 @@
 int handle_arguments(int argc, char **argv)
 {
     // help command
-        if (argc == 2)
-        {
-            if (std::string(argv[1]) == "--help"){
-                Logger::info("Usage: webserver { [OPTIONS] || <config-filepath> }");
-                Logger::info("         --help                           Display this help and exit");
-                Logger::info("         -t <config-filepath>             Test the configuration file");
-                Logger::info("         -v                               Display the current version");
-                return(1);
-            }
-            // version command
-            if (std::string(argv[1]) == "-v"){
-                Logger::info("webserver version: webserver/" VERSION);
-                return(1);
-            }
-            // testing config file command
-            if (std::string(argv[1]) == "-t")
-            {
-                Logger::info("webserver config-file testing: missing <config-filepath>");
-                return(1);
-            }
-            
-            return 0;
-            
-        } else if(argc == 3) {
-            if (std::string(argv[1]) != "-t"){
-                Logger::info("webserver: try 'webserver --help' for more information");
-                return(1);
-            }
-            ConfigParser configParser;
-            std::vector<Server> servers = configParser.fromConfigFileToServers(argv[2]);
-
-            if (configParser.validatePath(argv[2]) || servers.empty()){
-                Logger::error(configParser.getFileName(), "config-file testing: KO");
-                return(1);
-            }
-            Logger::info("webserver config-file testing: OK");
-            return(1);
-        } else {
-            Logger::info("webserver: try 'webserver --help' for more information");
-            return(1);
+    if (argc == 2){
+        if (std::string(argv[1]) == "--help"){
+            Logger::info("Usage: webserver { [OPTIONS] || <config-filepath> }");
+            Logger::info("         --help                           Display this help and exit");
+            Logger::info("         -t <config-filepath>             Test the configuration file");
+            Logger::info("         -v                               Display the current version");
+            return (1);
         }
+        // version command
+        if (std::string(argv[1]) == "-v"){
+            Logger::info("webserver version: webserver/" VERSION);
+            return (1);
+        }
+        // testing config file command
+        if (std::string(argv[1]) == "-t"){
+            Logger::info("webserver config-file testing: missing <config-filepath>");
+            return (1);
+        }
+
         return 0;
-} 
+    }
+    else if (argc == 3){
+        if (std::string(argv[1]) != "-t"){
+            Logger::info("webserver: try 'webserver --help' for more information");
+            return (1);
+        }
+        ConfigParser configParser;
+        configParser.init();
+
+        bool isConfigPathInvalid = configParser.validatePath(std::string(argv[2]));
+        if (isConfigPathInvalid){
+            Logger::error(argv[1], "Invalid configuration file path");
+            return 1;
+        }
+
+        std::vector<Server> servers = configParser.extractServerConfiguration(argv[2]);
+        if (servers.empty()){
+            Logger::error(argv[1], "Invalid configuration file");
+            return 1;
+        }
+        Logger::info("webserver config-file testing: OK");
+        return (1);
+    }
+    else{
+        Logger::info("webserver: try 'webserver --help' for more information");
+        return (1);
+    }
+    return 0;
+}
 
 std::string fromDIRtoHTML(std::string dirPath, std::string url)
 {
-    std::string html = "<!DOCTYPE html>"
-                       "<html lang=\"en\">"
-                       "<head>"
-                       "<meta charset=\"UTF-8\">"
-                       "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-                       "<title>WebServer</title>"
-                       "</head>"
-                       "<body>";
+    std::string html;
+    html += "<!DOCTYPE html>";
+    html += "<html lang=\"en\">";
+    html += "<head>";
+    html += "<meta charset=\"UTF-8\">";
+    html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">";
+    html += "<title>WebServer</title>";
+    html += "</head>";
+    html += "<body><ul>";
+
     DIR *dir;
     struct dirent *ent;
     if ((dir = opendir(dirPath.c_str())) != NULL){
         while ((ent = readdir(dir)) != NULL){
-            if (url != "/")
-                html += "<li><a href=\"" + url + std::string(ent->d_name) + "\">" + std::string(ent->d_name) + "</a></li>";
-            else
-                html += "<li><a href=\"" + std::string(ent->d_name) + "\">" + std::string(ent->d_name) + "</a></li>";
+            std::string name = ent->d_name;
+
+            if (name == "." || name == "..")
+                continue;
+
+            std::string fullPath = dirPath + "/" + name;
+            struct stat st;
+            if (stat(fullPath.c_str(), &st) == 0 && S_ISDIR(st.st_mode)){
+                name += "/";
+            }
+
+            std::string href = (url != "/" ? url + name : name);
+            html += "<li><a href=\"" + href + "\">" + name + "</a></li>";
         }
+        html += "</ul></body></html>";
         closedir(dir);
+    }else{
+        return "";
     }
-    else
-        return "Error: could not open directory";
-    html += "</ul></body></html>";
+
     return html;
 }
-
 
 std::string ErrToStr(int error)
 {
@@ -114,9 +131,9 @@ std::string ErrToStr(int error)
     case INVALID_MAX_REQUEST_SIZE:
         return "Error: Request too long";
     case INVALID_CONNECTION_CLOSE_BY_CLIENT:
-        return "Error: Connection closed by client";
+        return "Error: Connection closed by c";
     case INVALID_REQUEST:
-        return "Error: Invalid request";
+        return "Error: Invalid req";
     case INVALID_CONTENT_LENGTH:
         return "Error: Invalid content length";
     case ERR_FCNTL:
@@ -173,8 +190,6 @@ std::string getContentType(std::string &url, int status)
         return "image/svg+xml";
     if (urlC == ".txt")
         return "text/plain";
-    // TODO: add support for error 415 unsupported media type
-    // Issue URL: https://github.com/PapaLeoneIV/42WebServer/issues/56
     return "text/plain";
 }
 
@@ -224,52 +239,66 @@ std::string getMessageFromStatusCode(int status)
     return "Status Code not recognized";
 }
 
-std::string getErrorPage(int status, Server *server) {
-    Logger::info("Trying to get error page for status: " + intToStr(status));
-    
-    if (server != NULL) {
+std::string getErrorPage(int status, Server *server)
+{
+    Logger::info("Trying to get error page for status: " + wb_itos(status));
+
+    if (server != NULL)
+    {
         std::map<std::string, std::vector<std::string> >::iterator it = server->getServerDir().begin();
-        for(; it != server->getServerDir().end(); it++) {
-            if (it->first == ("error_page_" + intToStr(status)) && it->second.size() > 0) {
-                    Logger::info("Found error_page directive for status: " + intToStr(status) + ", path: " + it->second[0]);
-                    return readTextFile(it->second[0]);
+        for (; it != server->getServerDir().end(); it++){
+            if (it->first == ("error_page_" + wb_itos(status)) && it->second.size() > 0)
+{
+                Logger::info("Found error_page directive for status: " + wb_itos(status) + ", path: " + it->second[0]);
+                return readTextFile(it->second[0]);
             }
         }
-        Logger::info("No error_page directive found for status: " + intToStr(status) + ", using default");
-    } else {
+        Logger::info("No error_page directive found for status: " + wb_itos(status) + ", using default");
+    }
+    else
+    {
         Logger::info("Server is NULL, using default error page");
     }
     std::string errorPath;
-    switch (status) {
-        case 400: errorPath = "./static/default-error-page/400.html"; break;
-        case 403: errorPath = "./static/default-error-page/403.html"; break;
-        case 404: errorPath = "./static/default-error-page/404.html"; break;
-        case 405: errorPath = "./static/default-error-page/405.html"; break;
-        case 411: errorPath = "./static/default-error-page/411.html"; break;
-        case 414: errorPath = "./static/default-error-page/414.html"; break;
-        case 500: errorPath = "./static/default-error-page/500.html"; break;
-        case 501: errorPath = "./static/default-error-page/501.html"; break;
-        case 505: errorPath = "./static/default-error-page/505.html"; break;
-        default: 
-            Logger::error("Utils", "No default error page for status: " + intToStr(status));
-            return "<html><body><h1>Errore " + intToStr(status) + "</h1><p>" + getMessageFromStatusCode(status) + "</p></body></html>";
+    switch (status)
+    {
+    case 400:
+        errorPath = "./static/default-error-page/400.html";
+        break;
+    case 403:
+        errorPath = "./static/default-error-page/403.html";
+        break;
+    case 404:
+        errorPath = "./static/default-error-page/404.html";
+        break;
+    case 405:
+        errorPath = "./static/default-error-page/405.html";
+        break;
+    case 411:
+        errorPath = "./static/default-error-page/411.html";
+        break;
+    case 414:
+        errorPath = "./static/default-error-page/414.html";
+        break;
+    case 500:
+        errorPath = "./static/default-error-page/500.html";
+        break;
+    case 501:
+        errorPath = "./static/default-error-page/501.html";
+        break;
+    case 505:
+        errorPath = "./static/default-error-page/505.html";
+        break;
+    default:
+        Logger::error("Utils", "No default error page for status: " + wb_itos(status));
+        return "<html><body><h1>Errore " + wb_itos(status) + "</h1><p>" + getMessageFromStatusCode(status) + "</p></body></html>";
     }
-    
+
     Logger::info("Using default error page: " + errorPath);
     return readTextFile(errorPath);
 }
 
-int checkPermissions(std::string fullPath, int mode)
-{
-    ERROR error = 0;
-    if ((error = access(fullPath.c_str(), mode)))
-    {
-        return error;
-    }
-    return SUCCESS;
-}
-
-int strToInt(std::string str)
+int wb_stoi(std::string str)
 {
     std::stringstream ss(str);
     int number;
@@ -277,7 +306,7 @@ int strToInt(std::string str)
     return number;
 }
 
-int strToHex(const std::string &str)
+int wb_stox(const std::string &str)
 {
     int number = 0;
     std::stringstream ss;
@@ -286,7 +315,7 @@ int strToHex(const std::string &str)
     return number;
 }
 
-std::string intToStr(int number)
+std::string wb_itos(int number)
 {
     std::stringstream ss;
     ss << number;
@@ -308,8 +337,7 @@ std::string readTextFile(std::string filePath)
     std::string fileContent;
     std::ifstream file(filePath.c_str(), std::ios::in);
     std::string line;
-    while (std::getline(file, line))
-    {
+    while (std::getline(file, line)){
         fileContent += line + "\n";
     }
     file.close();

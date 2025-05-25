@@ -1,42 +1,42 @@
-#include "../../includes/Parser.hpp"
+#include "../../includes/ResourceValidator.hpp"
 #include "../../includes/Response.hpp"
 #include "../../includes/Client.hpp"
 #include "../../includes/Utils.hpp"
 
-int Parser::checkResource(std::string filePath, Response* response, int accessMode) {
+int ResourceValidator::checkResource(const std::string& filePath, Response* resp, int accessMode) {
     
     struct stat sb;
     if (access(filePath.c_str(), F_OK) == -1) {
-        response->setStatusCode(404);
-        return -1;
+        resp->setStatusCode(404);
+        return 0;
     }
 
     if (stat(filePath.c_str(), &sb) == -1) {
-        response->setStatusCode(500);
-        return -1;
+        resp->setStatusCode(500);
+        return 0;
     }
 
     if (S_ISREG(sb.st_mode) || S_ISDIR(sb.st_mode)) {
-        if (checkPermissions(filePath, accessMode) != SUCCESS) {
-            response->setStatusCode(403);
-            return -1;
+        if (access(filePath.c_str(), accessMode)) {
+            resp->setStatusCode(403);
+            return 0;
         }
     } else {
-        response->setStatusCode(403);
-        return -1;
+        resp->setStatusCode(403);
+        return 0;
     }
 
     return sb.st_mode;
 }
 
 
-std::string Parser::readFile(std::string filePath, Response *response)
+std::string ResourceValidator::readFile(const std::string& filePath, Response* resp)
 {
     std::string fileContent;
     std::ifstream file(filePath.c_str(), std::ios::in | std::ios::binary);
     if (!file) {
         std::cerr << "Error: Unable to open file " << filePath << std::endl;
-        response->setStatusCode(404);
+        resp->setStatusCode(404);
         return "";
     }
 
@@ -49,7 +49,7 @@ std::string Parser::readFile(std::string filePath, Response *response)
     return fileContent;
 }
 
-std::string Parser::extractQueryParams(const std::string &url, const std::string  &paramName, const std::string &defaultValue, const std::vector<std::string> &validValues) {
+std::string ResourceValidator::extractQueryParams(const std::string &url, const std::string  &paramName, const std::string &defaultValue, const std::vector<std::string> &validValues) {
     size_t queryPos = url.find('?');
     if (queryPos == std::string::npos) {
         return defaultValue;
@@ -84,7 +84,7 @@ std::string Parser::extractQueryParams(const std::string &url, const std::string
     return defaultValue;
 }
 
-bool Parser::isQueryParamValid(const std::string& url, const std::string& paramName, bool defaultValue) {
+bool ResourceValidator::isQueryParamValid(const std::string& url, const std::string& paramName, bool defaultValue) {
     std::vector<std::string> trueValues;
     trueValues.push_back("true");
     trueValues.push_back("1");

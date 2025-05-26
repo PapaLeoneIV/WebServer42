@@ -1,39 +1,23 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
-#include <string.h>
-#include <unistd.h>
-#include <sstream>
-#include <iostream>
-#include <stdexcept>
-#include <sys/stat.h>
-#include <bits/stdc++.h>
-#include <dirent.h>
-#include <assert.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <fcntl.h>
-#include <netdb.h>
-
-#include <algorithm>
 #include <string>
-#include <map>
-#include <iostream>
-#include <vector>
-#include <set>
+#include <fstream>
+#include <sys/types.h>
+#include <dirent.h>
 
 class Server;
 
-#define BUFFER_SIZE 4*1024 //4KB
+#define BUFFER_SIZE (4*1024) //4KB
 
-#define MAX_REQUEST_SIZE 100*1024*1024 //100MB
+#define MAX_REQUEST_SIZE (100*1024*1024) //100MB
 
 #define TIMEOUT_SEC 20
 
 #define VERSION "4.2.0"
 
 //List of possible error in the program, used to return a string error message
-//to check the actual error message, checkout functionn ErrToStr in Utlis.cpp
+//to check the actual error message, checkout function ErrToStr in Utils.cpp
 enum POSSIBLE_ERRORS{
     FAILURE = -1,
     SUCCESS, 
@@ -129,19 +113,19 @@ int wb_stox(const std::string& str);
 
 std::string wb_itos(int number);
 
-int wb_stoi(std::string str);
+int wb_stoi(const std::string& str);
 
-std::string fromDIRtoHTML(std::string dirPath, std::string url);
+std::string wb_ltos(const long number);
 
-std::string readTextFile(std::string filePath);
+std::string fromDIRtoHTML(const std::string& path, const std::string& url);
 
-std::string getMessageFromStatusCode(int status);
+std::string readTextFile(const std::string& path);
 
-std::string getContentType(std::string& url, int status);
+std::string fromCodeToMsg(int status);
+
+std::string getContentType(const std::string& url, int status);
 
 std::string ErrToStr(int error);
 
-
-
-std::string getErrorPage(int status, Server *server);
+std::string getErrorPage(int status, Server *s);
 #endif

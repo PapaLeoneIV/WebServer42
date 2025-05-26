@@ -11,7 +11,7 @@ public:
     ~Request();
 
     // Request consumption
-    int  consume(const std::string& buffer);
+    void  consume(const std::string& buffer);
     
     //debug
     void print();
@@ -23,18 +23,18 @@ public:
     std::string& getVersion();
     std::map<std::string, std::string>& getHeaders();
     std::string& getQueryParam();
-    int getState();
+    int getState() const;
     int getError() const;
     int getBodyCounter() const;
     bool getHasBody() const;
 
     // Setters
-    void setQueryParam(std::string& queryParam);
+    void setQueryParam(const std::string& queryParam);
     void setError(int errorCode);
-    void setUrl(std::string& url);
-    void setVersion(std::string& version);
-    void setHeaders(std::map<std::string, std::string>& headers);
-    void setBody(std::string& body);
+    void setUrl(const std::string& url);
+    void setVersion(const std::string& version);
+    void setHeaders(const std::map<std::string, std::string>& headers);
+    void setBody(const std::string& body);
     void setHasBody(bool hasBody);
     void setState(int state);
     void setBodyCounter(int counter);

@@ -3,21 +3,21 @@
 #include "../../includes/Client.hpp"
 #include "../../includes/Utils.hpp"
 
-int ResourceValidator::checkResource(const std::string& filePath, Response* resp, int accessMode) {
+mode_t ResourceValidator::checkResource(const std::string& path, Response* resp, int accessMode) {
     
-    struct stat sb;
-    if (access(filePath.c_str(), F_OK) == -1) {
+    struct stat sb = {};
+    if (access(path.c_str(), F_OK) == -1) {
         resp->setStatusCode(404);
         return 0;
     }
 
-    if (stat(filePath.c_str(), &sb) == -1) {
+    if (stat(path.c_str(), &sb) == -1) {
         resp->setStatusCode(500);
         return 0;
     }
 
     if (S_ISREG(sb.st_mode) || S_ISDIR(sb.st_mode)) {
-        if (access(filePath.c_str(), accessMode)) {
+        if (access(path.c_str(), accessMode)) {
             resp->setStatusCode(403);
             return 0;
         }
@@ -30,12 +30,12 @@ int ResourceValidator::checkResource(const std::string& filePath, Response* resp
 }
 
 
-std::string ResourceValidator::readFile(const std::string& filePath, Response* resp)
+std::string ResourceValidator::readFile(const std::string& path, Response* resp)
 {
     std::string fileContent;
-    std::ifstream file(filePath.c_str(), std::ios::in | std::ios::binary);
+    std::ifstream file(path.c_str(), std::ios::in | std::ios::binary);
     if (!file) {
-        std::cerr << "Error: Unable to open file " << filePath << std::endl;
+        std::cerr << "Error: Unable to open file " << path << std::endl;
         resp->setStatusCode(404);
         return "";
     }
@@ -50,20 +50,20 @@ std::string ResourceValidator::readFile(const std::string& filePath, Response* r
 }
 
 std::string ResourceValidator::extractQueryParams(const std::string &url, const std::string  &paramName, const std::string &defaultValue, const std::vector<std::string> &validValues) {
-    size_t queryPos = url.find('?');
+    const size_t queryPos = url.find('?');
     if (queryPos == std::string::npos) {
         return defaultValue;
     }
     
     std::string queryString = url.substr(queryPos + 1);
-    std::string paramPrefix = paramName + "=";
-    
-    size_t paramPos = queryString.find(paramPrefix);
+    const std::string paramPrefix = paramName + "=";
+
+    const size_t paramPos = queryString.find(paramPrefix);
     if (paramPos == std::string::npos) {
         return defaultValue;
     }
-    
-    size_t valueStart = paramPos + paramPrefix.length();
+
+    const size_t valueStart = paramPos + paramPrefix.length();
     size_t valueEnd = queryString.find('&', valueStart);
     if (valueEnd == std::string::npos) {
         valueEnd = queryString.length();
@@ -94,8 +94,8 @@ bool ResourceValidator::isQueryParamValid(const std::string& url, const std::str
     falseValues.push_back("false");
     falseValues.push_back("0");
     falseValues.push_back("FALSE");
-    
-    std::string value = extractQueryParams(url, paramName, defaultValue ? "true" : "false", trueValues);
+
+    const std::string value = extractQueryParams(url, paramName, defaultValue ? "true" : "false", trueValues);
 
     if (value.empty()) {
         return defaultValue;

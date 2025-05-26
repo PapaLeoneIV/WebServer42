@@ -3,16 +3,14 @@
 #include "./includes/Booter.hpp"
 #include "./includes/Logger.hpp"
 
-
-int main(int argc, char **argv)
-{
+int main(const int argc, char **argv){
     if (handle_arguments(argc, argv))
         return (1);
 
     ConfigParser cp;
     cp.init();
 
-    bool isConfigPathInvalid = cp.validatePath(std::string(argv[1]));
+    const bool isConfigPathInvalid = cp.validatePath(std::string(argv[1]));
     if (isConfigPathInvalid){
         Logger::error(argv[1], "Invalid configuration file path");
         return 1;

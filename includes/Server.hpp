@@ -2,21 +2,13 @@
 #define SERVER_HPP
 
 
-#include <string.h>
-#include <unistd.h>
 #include <sstream>
-#include <iostream>
-
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <fcntl.h>
 #include <netdb.h>
 
 #include <string>
 #include <map>
 #include <vector>
-
-
 
 typedef int SOCKET;
 typedef int ERROR;
@@ -28,23 +20,23 @@ class Server{
     ~Server();
 
     // GETTERS
-    SOCKET      getServerSocket();
-    fd_set      getFdsSet();
+    SOCKET      getServerSocket() const;
+    fd_set      getFdsSet() const;
     addrinfo    &getHints();
-    addrinfo    *getBindAddrss();
+    addrinfo    *getBindAddress() const;
     std::string &gethostPortPair();
     std::map<std::string, std::vector<std::string> > &getServerDir();
     std::map<std::string, std::map<std::string, std::vector<std::string> > > &getLocationDir(); 
 
     //SETTERS
     void    setServerDir(std::string key, std::vector<std::string> value);
-    void    setLocationDir(std::string locationPath, std::string key,  std::vector<std::string> value);
+    void    setLocationDir(const std::string& locationPath, const std::string& key,  const std::vector<std::string>& value);
 
     void    setServerSocket(SOCKET server_socket);
-    void    setFds(fd_set fds);
-    void    setHints(addrinfo hints);
+    void    setFds(const fd_set &fds);
+    void    setHints(const addrinfo &hints);
     void    setBindAddress(addrinfo *bind_address);
-    void    sethostPortPair(std::string hostPortPair);
+    void    sethostPortPair(const std::string& hostPortPair);
 
     private:
     std::map<std::string, std::vector<std::string> > serverDir;

@@ -3,6 +3,7 @@
 
 #include <string>
 #include <map>
+#include <iostream>
 
 typedef int SOCKET;
 
@@ -10,12 +11,10 @@ class Response {
 public:
     // Constructors & Destructor
     Response();
-    Response(int status, const char* status_message);
-    Response(int status, const std::string& status_message);
     ~Response();
 
     // Core Methods
-    void print();
+    void print() const;
     void prepareResponse();
     void fillStatusLine();
     void fillHeader(const std::string& headerKey, const std::string& headerValue);

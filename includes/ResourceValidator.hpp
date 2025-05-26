@@ -4,8 +4,16 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <set>
-#include <unistd.h>  // for access()
+#include <sys/types.h>
+#include <climits>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <cstdio>
+
+
 
 class Server;
 class Client;
@@ -18,27 +26,29 @@ public:
     ~ResourceValidator();
 
     // HTTP Method Handlers
-    void handleGET(Client* c, std::string& filePath, bool isAutoIndexOn);
-    void handleDELETE(Client* c, const std::string& filePath);
-    void handleCGI(Client* c, const std::string& target,
-                    std::map<std::string, std::vector<std::string> >& locationBlock);
+    static void handleGET(Client* c, std::string& path, bool isAutoIndexOn) ;
+    static void handleDELETE(Client* c, const std::string& path);
+    static void handleCGI(Client* c, const std::string& target,
+                    std::map<std::string, std::vector<std::string> >& locationBlock) ;
 
     // Validation & Matching
-    void validateResource(Client* c, Server* server);
-    bool isValidCGIExtension(std::map<std::string, std::vector<std::string> >& locationBlock,
+    static void validateResource(Client* c, Server* s) ;
+    static bool isValidCGIExtension(std::map<std::string, std::vector<std::string> >& locationBlock,
                              const std::string& urlFile);
-    int checkResource(const std::string& filePath, Response* resp, int accessMode);
-    int deleteResource(const std::string& filePath, Response* resp, bool useDetailedResponse = true);
-    std::string getMatchingLocation(std::string url, Server* server);
+
+    static mode_t checkResource(const std::string& path, Response* resp, int accessMode);
+    static int deleteResource(const std::string& path, Response* resp, bool useDetailedResponse = true);
+    static std::string getMatchingLocation(std::string url, Server* s);
 
     // Utilities
-    std::string readFile(const std::string& filePath, Response* resp);
-    std::string extractQueryParams(const std::string& url, const std::string& paramName,
+    static std::string readFile(const std::string& path, Response* resp);
+    static std::string extractQueryParams(const std::string& url, const std::string& paramName,
                                    const std::string& defaultValue,
                                    const std::vector<std::string>& validValues);
-    bool isQueryParamValid(const std::string& url, const std::string& paramName, bool defaultValue = false);
-    std::string findBestApproximationString(const std::string& url, const std::vector<std::string>& dictionary);
-    unsigned int levenshteinDistance(const std::string& s1, const std::string& s2);
+    static bool isQueryParamValid(const std::string& url, const std::string& paramName, bool defaultValue = false);
+    static std::string findBestApproximationString(const std::string& url, const std::vector<std::string>& dictionary);
+
+    static unsigned int levenshteinDistance(const std::string& s1, const std::string& s2);
 };
 
 #endif // PARSER_HPP

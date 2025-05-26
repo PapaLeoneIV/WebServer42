@@ -1,13 +1,9 @@
 #ifndef CLIENTS_HPP
 #define CLIENTS_HPP
 
-#include <string>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <fcntl.h>
-#include <netdb.h>
-#include <ctime>
-
+#include <cstring>
 #include "Cgi.hpp"
 
 class Server;
@@ -23,54 +19,35 @@ public:
     ~Client();
 
     // Getters
-    Cgi&            getCgiObj();
-    Request*        getRequest();
-    Response*       getResponse();
+    Cgi&    getCgiObj();
+    Request*    getRequest() const;
+    Response*   getResponse() const;
     sockaddr_storage& getAddr();
-    socklen_t&      getAddrLen();
-    SOCKET&         getSocketFd();
-    std::string     getRequestData();
-    std::string     getHeadersData();
-    std::string     getBodyData();
-    int             getContentLength();
-    int&            getRecvBytes();
-    Server*         getServer();
-    time_t          getLastActivity();
-    bool            isCgiRequest();
+    socklen_t&  getAddrLen();
+    SOCKET& getSocketFd();
+    Server* getServer() const;
+    time_t  getLastActivity() const;
 
     // Setters
-    void            setCgiObj(Cgi cgi_obj);
-    void            set_Request(Request* req);
-    void            set_Response(Response* resp);
-    void            setAddr(sockaddr_storage addr); 
-    void            setAddrLen(socklen_t len);
-    void            setSocketFd(SOCKET fd);
-    void            setRequestData(const std::string& requestData);
-    void            setHeadersData(const std::string& headersData);
-    void            setBodyData(const std::string& bodyData);
-    void            setContentLength(int contentLength); 
-    void            setRecvData(int bytes);
-    void            setServer(Server* server);
-    void            updateLastActivity();
-    void            setIsCgiRequest(bool value);
-    void            reset();
+    void    setAddr(const sockaddr_storage &addr); 
+    void    setAddrLen(socklen_t len);
+    void    setSocketFd(SOCKET fd);
+    void    setServer(Server* s);
+    void    updateLastActivity();
+    void    setIsCgiRequest(bool value);
+    void    reset();
 
 private:
     // Request handling
-    Request*        _Request;
-    Response*       _Response;
-    Cgi             _cgi_obj;
+    Request*        req;
+    Response*       resp;
+    Cgi             cgi_obj;
 
     // Connection metadata
-    Server*             _server;
-    sockaddr_storage    _address;
-    socklen_t           _address_length;
-    SOCKET              _socket;
-
-    // Request data
-    std::string     _requestData;
-    std::string     headersData;
-    std::string     _bodyData;
+    Server*             s;
+    sockaddr_storage    address;
+    socklen_t           addressLength;
+    SOCKET              socket;
 
     // Request state
     int             _content_length;

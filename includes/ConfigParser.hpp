@@ -1,18 +1,17 @@
 #ifndef CONFIGPARSER_HPP
 #define CONFIGPARSER_HPP
 
-#include <cstddef>
-#include <exception>
-#include <fstream>
-#include <iostream>
-#include <limits.h>
 #include <map>
-#include <stack>
 #include <string>
-#include <stdlib.h>
+#include <vector>
+
+
+#include <stdio.h>
+#include <stack>
+#include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <vector>
+#include <climits>
 
 
 #include "../includes/Server.hpp"
@@ -24,7 +23,7 @@ typedef int (*FunctionPtr)(std::vector<std::string>);
 
 typedef std::map<std::string, std::vector<std::string> > ConfigDirectiveMap;
 
-typedef std::vector<std::string> directiveValueVector;
+typedef  std::vector<std::string> directiveValueVector;
 
 class ConfigParser {
 public:
@@ -41,15 +40,17 @@ public:
     void setFileName(const std::string& path);
     std::string getFileName();
     int validatePath(const std::string& path);
-    void deleteTree(Treenode* node);
+
+    static void deleteTree(Treenode* node);
 
     // Tree & Directive processing
     Treenode* createConfigTree(const std::string& path);
-    int extractDirectives(Server& server, Treenode* node);
-    int isValidDirective(const std::string& token);
-    bool verifyDirectives(Server& server);
-    int checkMandatoryDirectives(Server& server);
-    int checkForAllowdMultipleDirectives(const std::string& directive);
+    int extractDirectives(Server& s, Treenode* node);
+
+    bool isValidDirective(const std::string &token);
+    bool verifyDirectives(Server& s);
+    int checkMandatoryDirectives(Server& s);
+    static int checkForAllowdMultipleDirectives(const std::string& directive);
 
     // Directive parsing
     int parseListenValues(directiveValueVector v);
@@ -80,7 +81,7 @@ private:
 std::string removeComments(std::ifstream& file);
 std::string trimLeftRight(const std::string& str);
 std::string removeEmptyLines(const std::string& input);
-std::string trimm(const std::string& input);
-int setUpDefaultDirectiveValues(Server* server);
+std::string wb_trim(const std::string& input);
+int setUpDefaultDirectiveValues(Server* s);
 
 #endif // CONFIGPARSER_HPP

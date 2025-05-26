@@ -26,7 +26,7 @@ int handle_arguments(int argc, char **argv)
 
         return 0;
     }
-    else if (argc == 3){
+    if (argc == 3){
         if (std::string(argv[1]) != "-t"){
             Logger::info("webserver: try 'webserver --help' for more information");
             return (1);
@@ -48,14 +48,11 @@ int handle_arguments(int argc, char **argv)
         Logger::info("webserver config-file testing: OK");
         return (1);
     }
-    else{
-        Logger::info("webserver: try 'webserver --help' for more information");
-        return (1);
-    }
-    return 0;
+    Logger::info("webserver: try 'webserver --help' for more information");
+    return (1);
 }
 
-std::string fromDIRtoHTML(std::string dirPath, std::string url)
+std::string fromDIRtoHTML(const std::string& path, const std::string& url)
 {
     std::string html;
     html += "<!DOCTYPE html>";
@@ -69,15 +66,15 @@ std::string fromDIRtoHTML(std::string dirPath, std::string url)
 
     DIR *dir;
     struct dirent *ent;
-    if ((dir = opendir(dirPath.c_str())) != NULL){
+    if ((dir = opendir(path.c_str())) != NULL){
         while ((ent = readdir(dir)) != NULL){
             std::string name = ent->d_name;
 
             if (name == "." || name == "..")
                 continue;
 
-            std::string fullPath = dirPath + "/" + name;
-            struct stat st;
+            std::string fullPath = path + "/" + name;
+            struct stat st = {};
             if (stat(fullPath.c_str(), &st) == 0 && S_ISDIR(st.st_mode)){
                 name += "/";
             }
@@ -94,7 +91,7 @@ std::string fromDIRtoHTML(std::string dirPath, std::string url)
     return html;
 }
 
-std::string ErrToStr(int error)
+std::string ErrToStr(const int error)
 {
     switch (error)
     {
@@ -147,7 +144,7 @@ std::string ErrToStr(int error)
     }
 }
 
-std::string getContentType(std::string &url, int status)
+std::string getContentType(const std::string &url, const int status)
 {
     if (status != 200)
         return "text/html";
@@ -155,13 +152,13 @@ std::string getContentType(std::string &url, int status)
         return "text/html";
     if (*(url.rbegin()) == '/')
         return "text/html";
-    size_t idx = url.find_last_of(".");
+    const size_t idx = url.find_last_of('.');
     if (idx == std::string::npos)
         return "text/plain";
-    std::string extension = url.substr(idx);
+    const std::string extension = url.substr(idx);
     if (extension.empty())
         return "text/plain";
-    std::string urlC = &extension[0];
+    const std::string urlC = &extension[0];
     if (urlC == ".css")
         return "text/css";
     if (urlC == ".csv")
@@ -193,7 +190,7 @@ std::string getContentType(std::string &url, int status)
     return "text/plain";
 }
 
-std::string getMessageFromStatusCode(int status)
+std::string fromCodeToMsg(const int status)
 {
     switch (status)
     {
@@ -236,19 +233,17 @@ std::string getMessageFromStatusCode(int status)
     default:
         return "Status Code not recognized";
     }
-    return "Status Code not recognized";
 }
 
-std::string getErrorPage(int status, Server *server)
+std::string getErrorPage(const int status, Server *s)
 {
     Logger::info("Trying to get error page for status: " + wb_itos(status));
 
-    if (server != NULL)
+    if (s != NULL)
     {
-        std::map<std::string, std::vector<std::string> >::iterator it = server->getServerDir().begin();
-        for (; it != server->getServerDir().end(); it++){
-            if (it->first == ("error_page_" + wb_itos(status)) && it->second.size() > 0)
-{
+        for (std::map<std::string, std::vector<std::string> >::iterator it = s->getServerDir().begin(); it != s->getServerDir().end(); ++it){
+            if (it->first == ("error_page_" + wb_itos(status)) && !it->second.empty())
+            {
                 Logger::info("Found error_page directive for status: " + wb_itos(status) + ", path: " + it->second[0]);
                 return readTextFile(it->second[0]);
             }
@@ -277,6 +272,9 @@ std::string getErrorPage(int status, Server *server)
     case 411:
         errorPath = "./static/default-error-page/411.html";
         break;
+    case 413:
+        errorPath = "./static/default-error-page/413.html";
+        break;
     case 414:
         errorPath = "./static/default-error-page/414.html";
         break;
@@ -291,20 +289,22 @@ std::string getErrorPage(int status, Server *server)
         break;
     default:
         Logger::error("Utils", "No default error page for status: " + wb_itos(status));
-        return "<html><body><h1>Errore " + wb_itos(status) + "</h1><p>" + getMessageFromStatusCode(status) + "</p></body></html>";
+        return "<html><body><h1>Errore " + wb_itos(status) + "</h1><p>" + fromCodeToMsg(status) + "</p></body></html>";
     }
 
     Logger::info("Using default error page: " + errorPath);
     return readTextFile(errorPath);
 }
 
-int wb_stoi(std::string str)
+int wb_stoi(const std::string& str)
 {
     std::stringstream ss(str);
     int number;
     ss >> number;
     return number;
 }
+
+
 
 int wb_stox(const std::string &str)
 {
@@ -315,12 +315,20 @@ int wb_stox(const std::string &str)
     return number;
 }
 
-std::string wb_itos(int number)
+std::string wb_itos(const int number)
 {
     std::stringstream ss;
     ss << number;
     return ss.str();
 }
+
+std::string wb_ltos(const long number)
+{
+    std::stringstream ss;
+    ss << number;
+    return ss.str();
+}
+
 
 std::string to_lower(const std::string &input)
 {
@@ -332,10 +340,10 @@ std::string to_lower(const std::string &input)
     return result;
 }
 
-std::string readTextFile(std::string filePath)
+std::string readTextFile(const std::string& path)
 {
     std::string fileContent;
-    std::ifstream file(filePath.c_str(), std::ios::in);
+    std::ifstream file(path.c_str(), std::ios::in);
     std::string line;
     while (std::getline(file, line)){
         fileContent += line + "\n";

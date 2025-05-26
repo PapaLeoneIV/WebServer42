@@ -1,6 +1,10 @@
 #ifndef BOOTER_HPP
 #define BOOTER_HPP
 
+#include <unistd.h>
+#include <fcntl.h>
+
+
 #include "Server.hpp"
 #include "ServerManager.hpp"
 

@@ -1,35 +1,35 @@
 #ifndef CGI_HPP
 #define CGI_HPP
 
-#include <string>
 #include <vector>
+#include <string>
+#include <stdio.h>
 #include <unistd.h>
-#include <cstdlib>
-#include <cstring>
 #include <stdlib.h>
+
 class Client;
 
 class Cgi{
 public:
     //main function
-    void execute(Client *c);
+    void execute(const Client *c);
     
     //setup
-    char **generateEnv(Client *c, std::string target);
+    static char **generateEnv(const Client *c, const std::string& target);
     void reset();
     
     //getter
-    char **getArgs();
+    char **getArgs() const;
     char **getEnv() const;
     int *getPipeIn();
     int *getPipeOut();
-    int getCgiPid();
-    size_t getBytesSended();
-    int getCGIState();
+    int getCgiPid() const;
+    size_t getBytesSended() const;
+    int getCGIState() const;
     
     
     //setters
-    void setArgs(std::string target, Client *c);
+    void setArgs(const std::string& target, const Client *c);
     void setEnv(char **envp);
     void setCGIState(int state);
     void incrementBytesSended(size_t bytes);

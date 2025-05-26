@@ -6,14 +6,14 @@
 /**
  * After we user recv(), we pass the req to consume().
  * It will analyze the req character by character, trying to
- * respect the HTTP protocol standard for req firstline, headers and body.
+ * respect the HTTP protocol standard for req-first line, headers and body.
  * While doing so, it keeps track of the various states of the req and where it
  * did stop parsing. So that, it the req is chunked, or
- * if the Client sended just a portion of the req, and will send the next one later,
+ * if the Client sent just a portion of the req, and will send the next one later,
  * consume() will be able to resume parsing where it previously stopped.
  */
 
-int Request::consume(const std::string &buffer)
+void Request::consume(const std::string &buffer)
 {
     for (size_t i = 0; i < buffer.size(); i++)
     {
@@ -42,7 +42,7 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 501; // Not Implemented
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             i--;
             continue;
@@ -54,7 +54,7 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 400; // req not valid
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->state = StateUrlBegin;
             continue;
@@ -66,7 +66,7 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 400; // req not valid
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->content.clear();
             this->content += character;
@@ -89,7 +89,7 @@ int Request::consume(const std::string &buffer)
                 {                      // url cannot be longer than 4MB
                     this->error = 414; // URI too long
                     this->state = StateParsingError;
-                    return 1;
+                    return ;
                 }
                 this->content.clear();
                 this->state = StateUrlQuery;
@@ -112,7 +112,7 @@ int Request::consume(const std::string &buffer)
             Logger::error("ResourceValidator", "Bad character in URL: '" + std::string(1, character) + "', ASCII: " + wb_itos(static_cast<int>(character)));
             this->error = 400;
             this->state = StateParsingError;
-            return 1;
+            return ;
         }
         case StateUrlQuery:
         {
@@ -139,7 +139,7 @@ int Request::consume(const std::string &buffer)
                 {
                     this->error = 400; // req not valid
                     this->state = StateParsingError;
-                    return 1;
+                    return ;
                 }
                 this->encoded_char = static_cast<char>(hex);
 
@@ -162,28 +162,28 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 400; // req not valid
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->setUrl(this->content);
             if (this->getUrl().size() > 4 * 1024)
             {                      // url cannot be longer than 4MB
                 this->error = 414; // URI too long
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->content.clear();
             this->state = StateVersion_H;
             continue;
         }
-        //"HTTP/1.1 only version admitted
+        //HTTP/1.1-only version admitted
         case StateVersion_H:
         {
             this->raw += character;
             if (character != 'T')
             {
-                this->error = 505; // HTTP Version Not Supported
+                this->error = 505; // HTTP Version Isn't Supported
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->state = StateVersion_HT;
             continue;
@@ -195,7 +195,7 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 505;
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->state = StateVersion_HTT;
             continue;
@@ -207,7 +207,7 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 505;
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->state = StateVersion_HTTP;
             continue;
@@ -219,7 +219,7 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 505;
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->state = StateVersion_HTTPSlash;
             continue;
@@ -231,7 +231,7 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 505;
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->state = StateVersion_HTTPSlashOne;
             continue;
@@ -243,7 +243,7 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 505;
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->state = StateVersion_HTTPSlashOneDot;
             continue;
@@ -255,7 +255,7 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 505;
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->state = StateVersion_HTTPSlashOneDotOne;
             continue;
@@ -267,7 +267,7 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 400; // Bad Request
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->version = this->content;
             this->content.clear();
@@ -281,7 +281,7 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 400;
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->content.clear();
             this->state = StateHeaderKey;
@@ -289,7 +289,7 @@ int Request::consume(const std::string &buffer)
         }
         // HTTP headers are structured such that each header field consists of a case-insensitive field name followed by a colon (:),
         //  optional leading whitespace, the field value, and optional trailing whitespace.They are serialized into a single string where
-        //  individual header fields are separated by CRLF (carriage return 1 and line feed, represented by \r\n in many programming languages).
+        //  individual header fields are separated by CRLF (carriage return and line feed, represented by \r\n in many programming languages).
         case StateHeaderKey:
         {
             this->raw += character;
@@ -304,7 +304,7 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 400; // Bad Request
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             if ((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || (character >= '0' && character <= '9') || (character == '_') || (character == '-'))
             {
@@ -314,7 +314,7 @@ int Request::consume(const std::string &buffer)
             std::cout << "this->error: character not allowed" << std::endl;
             this->error = 400; // Bad Request
             this->state = StateParsingError;
-            return 1;
+            return ;
         }
         case StateHeadersTrailingSpaceStart:
         {
@@ -335,7 +335,7 @@ int Request::consume(const std::string &buffer)
             {
                 // Trim trailing whitespace from value
                 std::string trimmed_value = trimLeftRight(this->content);
-                this->headers[to_lower(this->headers_key)] = to_lower(trimmed_value);
+                this->headers[to_lower(this->headers_key)] = trimmed_value;
                 this->content.clear();
                 this->state = StateHeaders_CR;
                 continue;
@@ -345,7 +345,7 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 400; // Bad Request
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
 
             this->content += character;
@@ -378,7 +378,7 @@ int Request::consume(const std::string &buffer)
             }
             this->error = 400; // Bad Request
             this->state = StateParsingError;
-            return 1;
+            return ;
         }
         case StateHeaders_LF:
         {
@@ -401,7 +401,7 @@ int Request::consume(const std::string &buffer)
                 {
                     this->error = 400; // Bad Request
                     this->state = StateParsingError;
-                    return 1;
+                    return ;
                 }
             if (!this->headers["content-length"].empty())
             {
@@ -454,7 +454,7 @@ int Request::consume(const std::string &buffer)
                 {
                     this->error = 400; // conversione in hex fallita
                     this->state = StateParsingError;
-                    return 1;
+                    return ;
                 }
                 if (this->number == 0)
                 {
@@ -470,7 +470,7 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 400; // carattere non esadecimale
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->content += character;
             continue;
@@ -482,7 +482,7 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 400;
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->state = StateChunkedChunk_LF;
             continue;
@@ -494,7 +494,7 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 400;
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->state = StateChunkedChunk;
             continue;
@@ -523,7 +523,7 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 400;
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->raw += character;
             this->state = StateBodyChunkedNumber;
@@ -536,19 +536,14 @@ int Request::consume(const std::string &buffer)
             {
                 this->error = 400;
                 this->state = StateParsingError;
-                return 1;
+                return ;
             }
             this->state = StateParsingComplete;
             continue;
         }
 
-        case StateParsingComplete:
-        {
-            {
-                return 1;
-            }
-            Logger::info("ResourceValidator: Parsing complete. Method: " + this->method + ", URL: " + this->url);
-            return 0;
+        case StateParsingComplete:{
+                return ;
         }
 
         default:
@@ -557,7 +552,6 @@ int Request::consume(const std::string &buffer)
             this->content += character;
         }
     }
-    return 1;
 }
 
 void Request::print()
@@ -579,7 +573,7 @@ void Request::print()
     std::cout << "Raw: " << this->raw << std::endl;
 }
 
-void Request::reset(void)
+void Request::reset()
 {
     this->headers.clear();
     this->raw.clear();
@@ -603,7 +597,7 @@ int Request::getBodyCounter() const { return this->body_counter; }
 
 void Request::setBodyCounter(int bodyCounter) { this->body_counter = bodyCounter; }
 
-int Request::getState() { return this->state; };
+int Request::getState() const { return this->state; };
 
 std::string &Request::getUrl() { return this->url; }
 
@@ -621,17 +615,17 @@ void Request::setError(int error) { this->error = error; };
 
 void Request::setState(int state) { this->state = state; };
 
-void Request::setHasBody(bool hasBody) { this->has_body = hasBody; }
+void Request::setHasBody(const bool hasBody) { this->has_body = hasBody; }
 
-void Request::setUrl(std::string &url) { this->url = url; }
+void Request::setUrl(const std::string &url) { this->url = url; }
 
-void Request::setVersion(std::string &version) { this->version = version; }
+void Request::setVersion(const std::string &version) { this->version = version; }
 
-void Request::setHeaders(std::map<std::string, std::string> &headers) { this->headers = headers; }
+void Request::setHeaders(const std::map<std::string, std::string> &headers) { this->headers = headers; }
 
-void Request::setBody(std::string &body) { this->body = body; }
+void Request::setBody(const std::string &body) { this->body = body; }
 
-void Request::setQueryParam(std::string &query_param) { this->query_param = query_param; };
+void Request::setQueryParam(const std::string &query_param) { this->query_param = query_param; };
 
 std::string &Request::getQueryParam() { return this->query_param; };
 

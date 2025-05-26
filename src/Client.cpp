@@ -62,7 +62,7 @@ Client::~Client(){
   static char address_info[INET6_ADDRSTRLEN];
   const int error = getnameinfo(reinterpret_cast<sockaddr *>(&this->getAddr()), this->getAddrLen(), address_info, sizeof(address_info), NULL, 0, NI_NUMERICHOST);
   if (error) {
-    Logger::error("Client", "Error getting c address: " + std::string(gai_strerror(error)));
+    Logger::error("Client", "Error getting client address: " + std::string(gai_strerror(error)));
   } else {
     Logger::info("Connection closed from " + std::string(address_info) +  printFd(this->getSocketFd()));
   }

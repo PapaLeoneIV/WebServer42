@@ -61,7 +61,7 @@ void ServerManager::closeClientConnection(const SOCKET fd, const Client* c)
             Logger::error("ServerManager", "Error closing socket");
         }
     } else {
-        Logger::info("Socket already closed [" + wb_itos(fd) + "]");
+        Logger::info("Socket already closed " + printFd(fd));
     }
     this->clients.erase(fd);
     delete c;
@@ -81,7 +81,7 @@ void ServerManager::handleClientTimeout(const time_t currentTime) {
     for (std::vector<SOCKET>::iterator it = clientsToRemove.begin(); it != clientsToRemove.end(); ++it) {
         SOCKET fd = *it;
         Client* c = this->clients[fd];
-        Logger::info("Connection timeout, closing connection [" + wb_itos(fd) + "]");
+        Logger::info("Connection timeout, closing connection " + printFd(fd));
         this->closeClientConnection(fd, c);
     }
 }

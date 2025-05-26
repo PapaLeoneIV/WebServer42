@@ -105,6 +105,8 @@ enum RequestStates {
     DELETE,
   };
 
+std::string printFd(int fd);
+
 int handle_arguments(int argc , char **argv);
 
 std::string to_lower(const std::string& input);

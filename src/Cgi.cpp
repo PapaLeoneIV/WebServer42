@@ -156,19 +156,25 @@ void Cgi::incrementBytesSended(const size_t bytes) { this->bytes_sended += bytes
 
 void Cgi::reset()
 {
-  for (int i = 0; args[i] != NULL; ++i)
+  if (args)
   {
-    free(args[i]);
+    for (int i = 0; args[i] != NULL; ++i)
+    {
+      free(args[i]);
+    }
+    free(args);
+    args = NULL;
   }
-  free(args);
-  args = NULL;
 
-  for (int i = 0; envp[i] != NULL; ++i)
+  if (envp && *envp)
   {
-    free(envp[i]);
+    for (int i = 0; envp[i] != NULL; ++i)
+    {
+      free(envp[i]);
+    }
+    free(envp);
+    envp = NULL;
   }
-  free(envp);
-  envp = NULL;
 
   cgi_state = 0;
   cgi_pid = -1;

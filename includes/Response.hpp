@@ -4,7 +4,7 @@
 #include <string>
 #include <map>
 #include <iostream>
-
+#include "Client.hpp"
 typedef int SOCKET;
 
 class Response {
@@ -15,14 +15,13 @@ public:
 
     // Core Methods
     void print() const;
-    void prepareResponse();
+    void prepareResponse(Client *c, Request *req);
     void fillStatusLine();
     void fillHeader(const std::string& headerKey, const std::string& headerValue);
 
     // Getters
     std::string& getResponse();
     std::string& getBody();
-    std::string& getContentType();
     std::string& getStatusMessage();
     int& getStatus();
     std::map<std::string, std::string>& getHeaders();
@@ -30,7 +29,6 @@ public:
     // Setters
     void setResponse(const char* resp);
     void setBody(const std::string& body);
-    void setContentType(const std::string& content_type);
     void setStatusMessage(const std::string& status_message);
     void setStatusCode(int status);
     void setHeaders(std::string key, std::string value);

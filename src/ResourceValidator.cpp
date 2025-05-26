@@ -11,7 +11,7 @@ void ResourceValidator::validateResource(Client *c, Server *s) {
     Request *req = c->getRequest();
     Response *resp = c->getResponse();
     
-    Logger::info("Starting resource validation for client FD: " + wb_itos(c->getSocketFd()));
+    Logger::info("Starting resource validation for client FD: " + printFd(c->getSocketFd()));
     // ─────────────────────────────────────────────────────────────
     // Enforce client_max_body_size limit (if defined)
     if(s->getServerDir().find("client_max_body_size") != s->getServerDir().end() 
@@ -20,8 +20,8 @@ void ResourceValidator::validateResource(Client *c, Server *s) {
             resp->setBody(getErrorPage(resp->getStatus(), c->getServer()));
             return;    
     }
-    Logger::info("Request URL: " + req->getUrl() + " [" + wb_itos(c->getSocketFd()) + "]");
-    Logger::info("Searching for best matching location...");
+    Logger::info("Request URL: " + req->getUrl() + printFd(c->getSocketFd()));
+    Logger::info("Searching for best matching location... " + printFd(c->getSocketFd()));
     
     // ─────────────────────────────────────────────────────────────
     // Find best matching location
@@ -32,7 +32,7 @@ void ResourceValidator::validateResource(Client *c, Server *s) {
         return;
     }
     std::map<std::string, std::vector<std::string> > &locationBlock = s->getLocationDir()[bestMatchingLocation];
-    Logger::info("Best matching location: " + bestMatchingLocation + " [" + wb_itos(c->getSocketFd()) + "]");
+    Logger::info("Best matching location: " + bestMatchingLocation +  printFd(c->getSocketFd()));
     
     // ─────────────────────────────────────────────────────────────
     //Check against Allowed Methods from a config file
@@ -43,7 +43,7 @@ void ResourceValidator::validateResource(Client *c, Server *s) {
         }
     }
     if(!foundMethod){
-        Logger::info("HTTP method " + req->getMethod() + " not allowed for this location.");
+        Logger::info("HTTP method " + req->getMethod() + " not allowed for this location " + printFd(c->getSocketFd()));
         resp->setStatusCode(405);
         resp->setBody(getErrorPage(resp->getStatus(), c->getServer()));
         return;
@@ -62,7 +62,7 @@ void ResourceValidator::validateResource(Client *c, Server *s) {
     
     // ─────────────────────────────────────────────────────────────
     //Check if is it a CGI Request
-    Logger::info("Checking if CGI handling is required...");
+    Logger::info("Checking if CGI handling is required..." + printFd(c->getSocketFd()));
     if(bestMatchingLocation.find("/cgi-bin") != std::string::npos){
         if(urlPath[urlPath.size() - 1] != '/' ){
             urlPath += "/";
@@ -74,7 +74,7 @@ void ResourceValidator::validateResource(Client *c, Server *s) {
     // ─────────────────────────────────────────────────────────────
     //Check for redirection
     if(locationBlock.find("return") != locationBlock.end()){
-        Logger::info("Redirecting with return directive, code: " + locationBlock["return"][0]);
+        Logger::info("Redirecting with return directive, code: " + locationBlock["return"][0] + printFd(c->getSocketFd()));
         resp->setStatusCode(wb_stoi(locationBlock["return"][0]));
         if(locationBlock["return"].size() > 1)
             resp->setHeaders("Location", locationBlock["return"][1]);
@@ -84,14 +84,14 @@ void ResourceValidator::validateResource(Client *c, Server *s) {
     // ─────────────────────────────────────────────────────────────
     //Alias substitution
     if(locationBlock.find("alias") != locationBlock.end()){
-        Logger::info("Applying alias: " + locationBlock["alias"][0]);
+        Logger::info("Applying alias: " + locationBlock["alias"][0] + printFd(c->getSocketFd()));
         urlPath = locationBlock["alias"][0]; 
     }
     
     // ─────────────────────────────────────────────────────────────
     //If 'root' is present, I need to attach a root-to-location path
     std::string path =  rootPath + urlPath + urlFile;
-    Logger::info("Resolved file path: " + path + " [" + wb_itos(c->getSocketFd()) + "]");
+    Logger::info("Resolved file path: " + path +  printFd(c->getSocketFd()));
 
     // ─────────────────────────────────────────────────────────────
     //Check if the user is requesting a directory 
@@ -101,13 +101,13 @@ void ResourceValidator::validateResource(Client *c, Server *s) {
     // ─────────────────────────────────────────────────────────────
     //Attach an index file to the path if the user is requesting a directory and the autoindex is off
     if (path[path.size() - 1] == '/' && !isAutoIndexOn) {
-        Logger::info("Directory requested. Appending index file: " + indexFile);
+        Logger::info("Directory requested. Appending index file: " + indexFile + printFd(c->getSocketFd()));
         path += indexFile;
     }
 
     // ─────────────────────────────────────────────────────────────
     //Handle GET, POST, DELETE 
-    Logger::info("Handling HTTP method: " + req->getMethod());
+    Logger::info("Handling HTTP method: " + req->getMethod() + printFd(c->getSocketFd()));
     if (req->getMethod() == "GET") {
         ResourceValidator::handleGET(c, path, isAutoIndexOn);
     } else if (req->getMethod() == "POST") {
@@ -116,7 +116,7 @@ void ResourceValidator::validateResource(Client *c, Server *s) {
         ResourceValidator::handleDELETE(c, path);
     } else {
         resp->setStatusCode(501);
-        resp->setBody(getErrorPage(501, s));
+        resp->setBody(getErrorPage(resp->getStatus(), s));
     }
 }
 
@@ -152,7 +152,7 @@ std::string ResourceValidator::findBestApproximationString(const std::string& ur
         }
     }
 
-    Logger::info("Best matching found: '" + best_match + "'");
+    // Logger::info("Best matching found: '" + best_match + "'" );
     return best_match;
 }
 
@@ -180,7 +180,7 @@ std::string ResourceValidator::getMatchingLocation(std::string url, Server* s) {
             }
         }
     }
-    Logger::info("The URL used for matching the location block: " + url);
+    // Logger::info("The URL used for matching the location block: " + url );
     return findBestApproximationString(url, dictionary);
 }
 
@@ -244,18 +244,18 @@ void ResourceValidator::handleDELETE(Client* c, const std::string& path) {
     Response *resp = c->getResponse();
 
 
-    Logger::info("DELETE req for: " + path + " [" + wb_itos(c->getSocketFd()) + "]");
+    Logger::info("DELETE req for: " + path +  printFd(c->getSocketFd()));
 
     const bool useDetailedResponse = isQueryParamValid(req->getUrl(), "details", false);
     const int result = ResourceValidator::deleteResource(path, resp, useDetailedResponse);
     if (result == SUCCESS) {
         if (resp->getStatus() == 204) {
-            Logger::info("DELETE req processed successfully (204 No Content): " + path + " [" + wb_itos(c->getSocketFd()) + "]");
+            Logger::info("DELETE req processed successfully (204 No Content): " + path +  printFd(c->getSocketFd()));
         } else {
-            Logger::info("DELETE req processed successfully (200 OK): " + path + " [" + wb_itos(c->getSocketFd()) + "]");
+            Logger::info("DELETE req processed successfully (200 OK): " + path +  printFd(c->getSocketFd()));
         }
     } else {
-        Logger::error("ResourceValidator", "Failed to process DELETE req: " + path + " (Status: " + wb_itos(resp->getStatus()) + ") [" + wb_itos(c->getSocketFd()) + "]");
+        Logger::error("ResourceValidator", "Failed to process DELETE req: " + path + " Status: " + wb_itos(resp->getStatus()) + printFd(c->getSocketFd()));
 
         resp->setBody(getErrorPage(resp->getStatus(), c->getServer()));
     }
@@ -301,7 +301,7 @@ void ResourceValidator::handleGET(Client* c, std::string& path, const bool isAut
         return;
     }
     
-    Logger::info("Reading file: " + path + " [" + wb_itos(c->getSocketFd()) + "]");
+    Logger::info("Reading file: " + path +  printFd(c->getSocketFd()));
     resp->setBody(ResourceValidator::readFile(path, resp));
 }
 

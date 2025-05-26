@@ -239,21 +239,15 @@ std::string getErrorPage(const int status, Server *s)
 {
     Logger::info("Trying to get error page for status: " + wb_itos(status));
 
-    if (s != NULL)
-    {
+    if (s != NULL){
         for (std::map<std::string, std::vector<std::string> >::iterator it = s->getServerDir().begin(); it != s->getServerDir().end(); ++it){
-            if (it->first == ("error_page_" + wb_itos(status)) && !it->second.empty())
-            {
+            if (it->first == ("error_page_" + wb_itos(status)) && !it->second.empty()){
                 Logger::info("Found error_page directive for status: " + wb_itos(status) + ", path: " + it->second[0]);
                 return readTextFile(it->second[0]);
             }
         }
         Logger::info("No error_page directive found for status: " + wb_itos(status) + ", using default");
-    }
-    else
-    {
-        Logger::info("Server is NULL, using default error page");
-    }
+    }else{Logger::info("Server is NULL, using default error page");}
     std::string errorPath;
     switch (status)
     {
@@ -304,8 +298,6 @@ int wb_stoi(const std::string& str)
     return number;
 }
 
-
-
 int wb_stox(const std::string &str)
 {
     int number = 0;
@@ -329,12 +321,12 @@ std::string wb_ltos(const long number)
     return ss.str();
 }
 
+std::string printFd(int fd){return " [" + wb_itos(fd) + "]";}
 
 std::string to_lower(const std::string &input)
 {
     std::string result = input;
-    for (size_t i = 0; i < result.size(); i++)
-    {
+    for (size_t i = 0; i < result.size(); i++){
         result[i] = std::tolower(static_cast<unsigned char>(result[i]));
     }
     return result;

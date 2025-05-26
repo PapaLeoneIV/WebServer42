@@ -1,5 +1,8 @@
 #include "../includes/Response.hpp"
 #include "../includes/Utils.hpp"
+#include "../includes/Client.hpp"
+#include "../includes/Request.hpp"
+#include "../includes/Server.hpp"
 
 
 
@@ -17,8 +20,17 @@ void Response::print() const {
     std::cout << this->finalResponse << std::endl;
 }
 
-void Response::prepareResponse(){
-    
+void Response::prepareResponse(Client *c, Request *req){
+    this->setHeaders("Host", c->getServer()->getServerDir()["server_name"][0]);
+    const std::string connectionHeader = to_lower(req->getHeaders()["connection"]);
+    connectionHeader == "close" ? this->setHeaders("Connection", "close") : this->setHeaders("Connection", "keep-alive");
+    if (!this->getBody().empty()){
+        this->setHeaders("Content-Type", getContentType(req->getUrl(), this->getStatus()));
+        this->setHeaders("Content-Length", wb_ltos(static_cast<long>(this->getBody().size())));
+    } else {
+        this->setHeaders("Content-Type", "text/html");
+        this->setHeaders("Content-Length", "0");
+    }
     this->fillStatusLine();
     this->finalResponse.append("\r\n");
     for(std::map<std::string, std::string>::iterator headerMapIt = this->headers.begin(); headerMapIt != this->headers.end(); headerMapIt++){
@@ -54,7 +66,6 @@ void Response::reset() {
 void Response::setHeaders(std::string key, std::string value) {this->headers[key] = value;}
 
 std::string &Response::getResponse()    {return this->finalResponse;}
-std::string &Response::getContentType() {return this->contentType;};
 std::string &Response::getBody()    {return this->body;}
 std::string &Response::getStatusMessage()   {return this->statusMessage;}
 std::map<std::string, std::string> &Response::getHeaders()  {return this->headers;}
@@ -63,7 +74,6 @@ int &Response::getStatus()  {return this->status;};
 
 void Response::setResponse(const char *resp)  {this->finalResponse = resp;}
 void Response::setBody(const std::string& body)    {this->body = body;}
-void Response::setContentType(const std::string& content_type) {this->contentType = content_type;}
 void Response::setStatusMessage(const std::string& status_message) {this->statusMessage = status_message;}
 void Response::setStatusCode(const int status)    {this->status = status;}
 

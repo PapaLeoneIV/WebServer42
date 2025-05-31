@@ -212,7 +212,7 @@ void ServerManager::processRequest(Client *c)
     }
 
     if (req->getState() == StateParsingError) {
-        Logger::error("ServerManager", "Error parsing reqrequest" + printFd(fd));
+        Logger::error("ServerManager", "Error parsing request" + printFd(fd));
         resp->setStatusCode(req->getError());
         resp->setBody(getErrorPage(resp->getStatus(), c->getServer()));
     }

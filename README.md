@@ -1,10 +1,10 @@
-# 🚀 Lightweight C++98 HTTP Web Server | 42 Project
+C++98 HTTP Web Server | 42 Project
 
 A high-performance, lightweight HTTP server built in **C++98**, developed as part of the **42 School Curriculum**. This project showcases essential web server fundamentals including **non-blocking I/O**, **select() for multiplexing**, **CGI integration**, and **virtual hosting**—all written without modern C++ features, ensuring full C++98 compatibility.
 
 ---
 
-## 🎯 Project Objectives
+## Project Objectives
 
 This project was designed to provide deep insights into network programming and server architecture. The main goals include:
 
@@ -17,7 +17,7 @@ This project was designed to provide deep insights into network programming and 
 
 ---
 
-## 🔧 How This C++ HTTP Server Works
+## How does it work
 
 This web server listens on multiple ports, handles multiple clients using `select()`, and supports serving static files, executing CGI programs, and returning appropriate HTTP responses.
 
@@ -25,14 +25,14 @@ It is fully compliant with basic HTTP/1.1 behaviors and can handle chunked bodie
 
 ---
 
-## 🧩 Components Overview
+## Components Overview
 
-### 🧾 ConfigParser
+### ConfigParser
 
 - Parses a custom configuration file using a **stack-based parser** and builds a **tree structure** to represent nested `server` and `location` blocks.  
 - Enables flexible and hierarchical configuration similar to NGINX.
 
-### 🖧 ServerManager
+### ServerManager
 
 Manages all active servers and client sockets:
 
@@ -40,20 +40,20 @@ Manages all active servers and client sockets:
 - `processRequest()` — Read and parse incoming HTTP requests  
 - `sendResponse()` — Build and send HTTP responses (static or CGI)
 
-### 📬 RequestParser
+### RequestParser
 
 - Implements a **state machine** to parse HTTP requests one character at a time.  
 - Supports **partial reads** and **HTTP pipelining**.  
 - Follows [RFC 3986](https://datatracker.ietf.org/doc/html/rfc3986) to ensure valid URI parsing.
 
-### 📦 ResourceValidator
+### ResourceValidator
 
 - Validates requested resources based on the parsed configuration.  
 - Handles errors like `404 Not Found`, `403 Forbidden`, and `405 Method Not Allowed`.
 
 ---
 
-## ⚙️ Supported Features
+## Supported Features
 
 | Feature                     | Status |
 |-----------------------------|--------|
@@ -69,16 +69,16 @@ Manages all active servers and client sockets:
 
 ---
 
-## 🧪 Example Use Cases
+## Example Use Cases
 
-- 🔄 Serve static content  
-- 🐍 Run Python CGI scripts  
-- ⚙️ Build a lightweight microservice  
-- 📚 Use as a learning project for network programming in C++
+- Serve static content  
+- Run Python CGI scripts  
+- Build a lightweight microservice  
+- Use as a learning project for network programming in C++
 
 ---
 
-## 🖥️ Running the Server
+## Running the Server
 
 ```bash
 make
@@ -89,7 +89,7 @@ make
 
 ---
 
-## 📁 Directory Structure
+## Directory Structure
 
 ```
 includes/       # Header files  
@@ -102,7 +102,7 @@ cgi-bin/        # Includes some .py and .sh scripts
 
 ---
 
-## 📚 Configuration File Overview
+## Configuration File Overview
 
 The config file supports:
 
@@ -126,13 +126,13 @@ server {
 ```
 
 
-## 🤝 Contributions
+## Contributions
 
-This project was completed as part of the **42 curriculum** all alone.
+This project was completed as part of the **42 curriculum** ALONE.
 
 ---
 
-## 🌐 Related Links
+## Related Links
 
 - [RFC 3986 – URI Syntax](https://datatracker.ietf.org/doc/html/rfc3986)  
 - [HTTP/1.1 Spec](https://www.rfc-editor.org/rfc/rfc2616)  
